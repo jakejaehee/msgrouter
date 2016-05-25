@@ -1,0 +1,68 @@
+BUG-20150806-01
+
+o 현상
+Client에서 메시지를 수신하면 수신한 메시지를 그대로 echo함.
+아래의 Client Pakcet Log 참조바람.
+
+:::::::::: Client Packet Log ::::::::::
+ 
+[2015-07-09 00:08:33,119] recv outTableReq: {
+	"dstSsKey":null,"dstId":"SITE_SDS","QueueEntry":"true","createdTime":"1436368113118","srcSsKey":"127.0.0.1","srcId":"SITE_SDS","_msgType":"outTableReq","msg":{
+		"MSG":{
+			"sqlId":"comCmn.insertComCmn21050m","records":{
+				"TRX_AUTH_YN":"1","EXCEL_AUTH_YN":"1","REG_AUTH_YN":"1","OT_PT_AUTH_YN":"1","REG_USER_ID":"admin","SITE_ID":"SITE_SDS","AUTH_CODE":"00","MENU_ID":"CND1310M","DEL_AUTH_YN":"1","QRY_AUTH_YN":"1","ALTR_AUTH_YN":"1"
+			}
+		}
+		,"_msgType":"outTableReq","DST_ID":"SITE_SDS","SEQ_NO":"940"
+	}
+	,"timeout":"0"
+}
+
+[2015-07-09 00:08:33,121] sent outTableReq: {"QueueEntry":true,"_msgType":"outTableReq","createdTime":1436368113118,"timeout":0,"srcId":"SITE_SDS","srcSsKey":"localhost","dstId":"SITE_SDS","dstSsKey":"localhost","msg":{
+	"MSG":{
+		"sqlId":"comCmn.insertComCmn21050m","records":{
+			"TRX_AUTH_YN":"1","EXCEL_AUTH_YN":"1","REG_AUTH_YN":"1","OT_PT_AUTH_YN":"1","REG_USER_ID":"admin","SITE_ID":"SITE_SDS","AUTH_CODE":"00","MENU_ID":"CND1310M","DEL_AUTH_YN":"1","QRY_AUTH_YN":"1","ALTR_AUTH_YN":"1"
+		}
+	}
+	,"_msgType":"outTableReq","DST_ID":"SITE_SDS","SEQ_NO":"940"
+}}
+
+[2015-07-09 00:08:33,123] sent outTableRes: {"QueueEntry":true,"_msgType":"outTableRes","createdTime":1436368113122,"timeout":0,"srcId":null,"srcSsKey":null,"dstId":"SITE_SDS","dstSsKey":"localhost","msg":{
+	"STAT":"X","ERR_MSG":"PRIMARY KEY 제약 조건 'PK_T_MGT_MENU_AUTH_M'을(를) 위반했습니다. 개체 'dbo.T_MGT_MENU_AUTH_M'에 중복 키를 삽입할 수 없습니다.","ERR_CD":"ERR-999","_msgType":"outTableRes","DST_ID":"SITE_SDS","SEQ_NO":"940"
+}}
+
+
+o 해결 방안
+
+--- exabus.engine.com.workerthread.BizBeanThread.java ---
+
+Client 의 경우 makeWriteEvent()가 호출되면 무조건  current session으로 메시지를 전송한다.
+따라서 msgRule.getRoutingRules()가 empty이거나 null이면 Transfer.transfer()를 호출하지 않도록 수정해야 한다.
+
+				for (int i = 0; i < msgRuleList.size(); i++) {
+					MessageRule msgRule = msgRuleList.get(i);
+					RoutingRules routingRules = msgRule.getRoutingRules();
+					if (routingRules != null) {  -> if (routingRules != null && (routingRules.getRouteToList().size() > 0 || routingRules.getSendToList().size() > 0)) {
+						Transfer.transfer(svc, exaQueue, routingRules, recvQE);
+					} else {
+						logTrace("Routing rule is not found for received message '"
+								+ recvQE.getType() + "'");
+					}
+
+
+--- exabus.engine.Transfer.java ---
+
+Client 의 경우 makeWriteEvent()가 호출되면 무조건  current session으로 메시지를 전송한다.
+
+	private static void makeWriteEvent(QueueEntry sendQE, Service currSvc,
+			ExaQueue currExaQueue, RoutingRules routingRules)
+			throws TechException {
+		try {
+			boolean dstFound = false;
+			ArrayList<String> sendToList = routingRules.getSendToList();
+			if (currSvc.getServiceConfig().isClientService()) {
+				sendToList = new ArrayList<String>();
+				sendToList.add(ProcessMap.VAL_SEND_TO_SESSION);
+			}
+			
+			

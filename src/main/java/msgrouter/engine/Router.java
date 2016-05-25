@@ -1,0 +1,207 @@
+package msgrouter.engine;
+
+import java.util.List;
+
+import msgrouter.api.QueueEntry;
+import msgrouter.api.interfaces.Message;
+import msgrouter.api.interfaces.bean.Marshal;
+import msgrouter.engine.config.rule.RoutingRules;
+import msgrouter.engine.config.rule.SwitchTo;
+import msgrouter.engine.queue.QueueTimeoutException;
+
+import org.apache.log4j.Logger;
+
+import elastic.util.lifecycle.LifeCycleObject;
+import elastic.util.util.TechException;
+
+public class Router {
+	
+	private static final Logger LOG = Logger.getLogger(Router.class);
+
+	public static void sendTo(QueueEntry qe, Service currSvc,
+			Session currSession) throws TechException, QueueTimeoutException {
+		boolean found = false;
+		String dstId = qe.getDstId();
+		String dstIp = qe.getDstIp();
+		Session dstSs = null;
+		LoginIdGroup idGroup = null;
+		IpGroup ipGroup = null;
+		
+		switch (currSvc.getServiceConfig().getRoutingTarget()) {
+		case Service.IVAL_ROUTING_TARGET_MSGROUTER_ID:
+		case Service.IVAL_ROUTING_TARGET_CUSTOM_ID:
+			switch (qe.getReqres()) {
+			case QueueEntry.IVAL_RES_SESSION_BEAN_THR:
+			case QueueEntry.IVAL_REQ_SESSION_CRONJOB:
+			case QueueEntry.IVAL_REQ_SESSION_IN:
+				if (dstId != null) {
+					if (currSession != null
+							&& dstId.equals(currSession.getLoginId())) {
+						idGroup = currSession.getIdGroup();
+					} else {
+						idGroup = currSvc.getLoginIdGroup(dstId, false);
+					}
+				} else {
+					if (currSession != null) {
+						currSession.putSQ(qe);
+						found = true;
+						break;
+					}
+				}
+				break;
+			case QueueEntry.IVAL_REQ_NOSESSION_CRONJOB:
+			case QueueEntry.IVAL_RES_NOSESSION_BEAN_THR:
+				if (dstId != null) {
+					idGroup = currSvc.getLoginIdGroup(dstId, false);
+				}
+				break;
+			}
+			if (idGroup != null) {
+				idGroup.putAllSQ(qe);
+				found = true;
+			}
+			break;
+		case Service.IVAL_ROUTING_TARGET_IP:
+			switch (qe.getReqres()) {
+			case QueueEntry.IVAL_RES_SESSION_BEAN_THR:
+			case QueueEntry.IVAL_REQ_SESSION_CRONJOB:
+			case QueueEntry.IVAL_REQ_SESSION_IN:
+				if (dstIp != null) {
+					if (currSession != null
+							&& dstIp.equals(currSession.getRemoteIp())) {
+						ipGroup = currSession.getIpGroup();
+					} else {
+						ipGroup = currSvc.getIpGroup(dstIp, false);
+					}
+				} else {
+					if (currSession != null) {
+						currSession.putSQ(qe);
+						found = true;
+						break;
+					}
+				}
+				break;
+			case QueueEntry.IVAL_REQ_NOSESSION_CRONJOB:
+			case QueueEntry.IVAL_RES_NOSESSION_BEAN_THR:
+				if (dstIp != null) {
+					ipGroup = currSvc.getIpGroup(dstIp, false);
+				}
+				break;
+			}
+			if (ipGroup != null) {
+				ipGroup.putAllSQ(qe);
+				found = true;
+			}
+			break;
+		case Service.IVAL_ROUTING_TARGET_SESSION:
+			String dstSsName = qe.getDstSessionName();
+			if (dstSsName != null) {
+				if (currSession != null
+						&& dstSsName.equals(currSession.getAlias())) {
+					dstSs = currSession;
+				} else {
+					dstSs = currSvc.getSessionByName(dstSsName);
+				}
+				if (dstSs != null) {
+					dstSs.putSQ(qe);
+					found = true;
+				}
+			} else {
+				switch (qe.getReqres()) {
+				case QueueEntry.IVAL_RES_SESSION_BEAN_THR:
+				case QueueEntry.IVAL_REQ_SESSION_CRONJOB:
+					if (currSession != null) {
+						currSession.putSQ(qe);
+						found = true;
+					}
+					break;
+				case QueueEntry.IVAL_REQ_NOSESSION_CRONJOB:
+				case QueueEntry.IVAL_RES_NOSESSION_BEAN_THR:
+					currSvc.putAllSQ(qe);
+					found = true;
+					break;
+				}
+			}
+			break;
+		}
+		if (!found) {
+			LifeCycleObject lco = currSession != null ? currSession : currSvc;
+			lco.logWarn("Dst not found: " + QueueEntry.class.getSimpleName()
+					+ "=" + qe);
+		}
+	}
+
+	public static void switchTo(QueueEntry qe, String dstSvcId)
+			throws TechException, QueueTimeoutException {
+		Service svc = MsgRouter.getInstance().getService(dstSvcId);
+		svc.getNoSession().putSWQ(qe);
+	}
+
+	/**
+	 * Switch를 한다.
+	 * 
+	 * @param qe
+	 * @param currSvc
+	 * @param currSession
+	 * @param routingRules
+	 * @throws TechException
+	 * @throws QueueTimeoutException
+	 */
+	public static void switchTo(QueueEntry qe, Service currSvc,
+			Session currSession, RoutingRules routingRules)
+			throws TechException, QueueTimeoutException {
+		if (routingRules != null) {
+			List<SwitchTo> switchToList = routingRules.getSwitchToList();
+			if (switchToList.size() > 0) {
+				switchTo(qe, currSvc, currSession, switchToList);
+			}
+		}
+	}
+
+	private static void switchTo(QueueEntry qe, Service currSvc,
+			Session currSession, List<SwitchTo> switchToList)
+			throws TechException, QueueTimeoutException {
+		for (int idx = 0; idx < switchToList.size(); idx++) {
+			SwitchTo switchTo = switchToList.get(idx);
+			if (switchTo != null) {
+				String dstSvcId = switchTo.getServiceId();
+				if (dstSvcId != null) {
+					switchTo(qe, currSvc, currSession, dstSvcId,
+							switchTo.getMarshalClass());
+				}
+			}
+		}
+	}
+
+	private static void switchTo(QueueEntry qe, Service currSvc,
+			Session currSs, String dstSvcId, Class marshalClass)
+			throws TechException, QueueTimeoutException {
+		if (dstSvcId != null) {
+			Service svc = dstSvcId.equals(currSvc.getServiceId()) ? currSvc
+					: MsgRouter.getInstance().getService(dstSvcId);
+			if (svc == null) {
+				LifeCycleObject lco = currSs != null ? currSs : currSvc;
+				lco.logWarn("There is no dst service '" + dstSvcId
+						+ "' to switch the message '" + qe.getBriefing()
+						+ "'");
+			} else {
+				if (marshalClass != null) {
+					Marshal marshal = (Marshal) MsgRouter.getInstance()
+							.getBeanCache()
+							.getBean(currSvc, currSs, marshalClass);
+
+					if (marshal != null) {
+						QueueEntry newQE = QueueEntry.copyMetaInfoFrom(qe);
+						for (int m = 0; m < qe.getMessageCount(); m++) {
+							Message oldMsg = qe.getMessage(m);
+							Message newMsg = marshal.marshalling(oldMsg);
+							newQE.addMessage(newMsg);
+						}
+						qe = newQE;
+					}
+				}
+				svc.getNoSession().putSWQ(qe);
+			}
+		}
+	}
+}

@@ -1,0 +1,75 @@
+package msgrouter.engine.socket.server;
+
+import java.io.IOException;
+import java.net.SocketAddress;
+import java.nio.channels.SelectionKey;
+import java.nio.channels.ServerSocketChannel;
+import java.nio.channels.SocketChannel;
+
+import elastic.util.lifecycle.LifeCycleObject;
+import elastic.util.net.SocketUtil;
+
+public class Acceptor extends LifeCycleObject {
+	private final AbstractServerSessionFactory factory;
+	private final Server svc;
+	private final SocketAddress address;
+
+	public Acceptor(SocketAddress address,
+			AbstractServerSessionFactory factory, Server server) {
+		super(Acceptor.class);
+
+		this.factory = factory;
+		this.svc = server;
+		this.address = address;
+	}
+
+	public SocketAddress getSocketAddress() {
+		return address;
+	}
+
+	public void tryToAccept(SelectorThr selThread, SelectionKey selKey)
+			throws IOException {
+		if (!currentLifeCycle().isActiveMode())
+			return;
+		try {
+			SocketChannel sc = ((ServerSocketChannel) selKey.channel())
+					.accept();
+			if (sc != null) {
+				logDebug("accepted a client: "
+						+ sc.socket().getInetAddress().getHostAddress() + ":"
+						+ sc.socket().getPort());
+
+				sc.configureBlocking(false);
+				// sc.socket().setTcpNoDelay(true);
+				sc.socket().setReceiveBufferSize(256 * 1024);
+				sc.socket().setSendBufferSize(256 * 1024);
+
+				SocketUtil su = new SocketUtil(sc);
+
+				AbstractServerSession session = factory.createSession(svc,
+						selThread, su);
+				if (session != null) {
+					boolean success = svc.registerColdSession(sc, session);
+				}
+			}
+		} catch (IOException e) {
+			throw e;
+		} catch (Throwable e) {
+			throw new IOException(e.getMessage());
+		}
+	}
+
+	public void run() {
+	}
+
+	public void killEventHandler() {
+		synchronized (this) {
+			logDebug("remove acceptor");
+			svc.removeAcceptor(this);
+		}
+	}
+
+	public boolean isBusy() {
+		return false;
+	}
+}

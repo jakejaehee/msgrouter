@@ -1,0 +1,11 @@
+package msgrouter.engine;
+
+public class MiscUtil {
+	public static int toPrimitiveType(Integer val, int defaultValue) {
+		return val != null ? val.intValue() : defaultValue;
+	}
+
+	public static boolean toPrimitiveType(Boolean val, boolean defaultValue) {
+		return val != null ? val.booleanValue() : defaultValue;
+	}
+}

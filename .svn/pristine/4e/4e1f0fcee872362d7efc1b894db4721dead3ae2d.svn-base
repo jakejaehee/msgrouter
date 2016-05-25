@@ -1,0 +1,112 @@
+package msgrouter.engine.config;
+
+import java.io.File;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+import msgrouter.api.security.EncryptEnv;
+import msgrouter.api.security.EncryptUtil;
+import msgrouter.engine.queue.QueueParams;
+
+import org.apache.log4j.Logger;
+import org.dom4j.Node;
+
+import elastic.util.util.FilePathUtil;
+import elastic.util.util.TechException;
+import elastic.util.xml.XmlReader;
+import elastic.util.xml.XmlUtil;
+
+public class MainConfig {
+	private static final Logger LOG = Logger.getLogger(MainConfig.class);
+
+	private XmlReader xml = null;
+	private String containerConfFullPath = null;
+	private QueueParams globalQP = null;
+	private Map<String, EncryptEnv> encEnvMap = null;
+
+	public MainConfig(File xmlFile) throws TechException {
+		xml = new XmlReader(xmlFile);
+		if (LOG.isInfoEnabled()) {
+			LOG.info("loading " + xml.getPath());
+		}
+
+		/*
+		 * Container configuration
+		 */
+		Node containerConfNode = xml.getNode("/Config/containerConfig");
+		String containerConfPath = XmlUtil.getAttributeStringValue(
+				containerConfNode, "xml");
+		containerConfFullPath = FilePathUtil.getAbsolutePath(xml.getDir(),
+				containerConfPath);
+
+		Node globalQueueNode = xml.getNode("/Config/queue");
+		if (globalQueueNode != null) {
+			globalQP = ServiceConfig.parseQueueNode(globalQueueNode);
+		}
+		if (globalQP != null) {
+			globalQP.setUndefinedAttributes(ServiceConfig
+					.getDefaultQueueParams());
+		} else {
+			globalQP = ServiceConfig.getDefaultQueueParams();
+		}
+
+		Node encryptsNode = xml.getNode("/Config/encrypts");
+		if (encryptsNode != null) {
+			initEncryptNode(encryptsNode);
+		}
+	}
+
+	public void initEncryptNode(Node encryptsNode) {
+		List encryptList = XmlUtil.getChildElements(encryptsNode);
+
+		for (int i = 0; encryptList != null && i < encryptList.size(); i++) {
+			Node encrypt = (Node) encryptList.get(i);
+			if (encrypt.getName().equalsIgnoreCase("encrypt")) {
+				EncryptEnv encEnv = new EncryptEnv();
+				encEnv.name = XmlUtil.getAttributeStringValue(encrypt, "name");
+				List encChilds = XmlUtil.getChildElements(encrypt);
+				for (int j = 0; encChilds != null && j < encChilds.size(); j++) {
+					Node encChild = (Node) encChilds.get(j);
+					if (encChild.getName().equalsIgnoreCase("algorithm")) {
+						encEnv.algorithm = XmlUtil.getText(encChild);
+					} else if (encChild.getName().equalsIgnoreCase(
+							"operationMode")) {
+						encEnv.operationMode = XmlUtil.getText(encChild);
+					} else if (encChild.getName().equalsIgnoreCase("padding")) {
+						encEnv.padding = XmlUtil.getText(encChild);
+					} else if (encChild.getName().equalsIgnoreCase("key")) {
+						encEnv.key = EncryptUtil.hexStringToBytes(XmlUtil
+								.getText(encChild));
+					} else if (encChild.getName().equalsIgnoreCase("iv")) {
+						encEnv.iv = EncryptUtil.hexStringToBytes(XmlUtil
+								.getText(encChild));
+					}
+				}
+				if (encEnvMap == null) {
+					encEnvMap = new HashMap<String, EncryptEnv>();
+				}
+				encEnvMap.put(encEnv.name, encEnv);
+				if (LOG.isTraceEnabled()) {
+					LOG.trace("EncryptEnv=" + encEnv);
+				}
+			}
+		}
+	}
+
+	public EncryptEnv getEncryptEnv(String encryptName) {
+		return encEnvMap.get(encryptName);
+	}
+
+	public String getDir() {
+		return xml.getDir();
+	}
+
+	public String getContainerConfigPath() {
+		return containerConfFullPath;
+	}
+
+	public QueueParams getGlobalQueueParams() {
+		return globalQP;
+	}
+}

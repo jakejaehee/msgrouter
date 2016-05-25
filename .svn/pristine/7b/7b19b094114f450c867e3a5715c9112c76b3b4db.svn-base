@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project name="msgrouter" default="deploy" basedir="." xmlns:fx="javafx:com.sun.javafx.tools.ant">
+	<property file="build.properties" />
+	 
+	<target name="deploy">
+		<fx:jar destfile="${jar.dist.dir}/msgrouter-admin-client.jar">
+		    <!-- Details about application -->
+		    <fx:application name="MsgRouter Admin Client"
+		            mainClass="msgrouter.ui.Main"/>
+		 
+		    <!-- Define what auxilary resources are needed -->
+		    <fx:resources>
+		        <fx:fileset dir="." includes="lib/*.jar"/>
+		    </fx:resources>
+		            
+		    <!-- What to include into result jar file?
+		         Everything in the build tree -->
+		    <fileset dir="${jar.dist.dir}/classes"/>
+		 
+		    <!-- Customize jar manifest (optional) -->
+		    <manifest>
+		        <attribute name="Implementation-Vendor" value="QTI"/>
+		        <attribute name="Implementation-Version" value="1.0"/>
+		    </manifest>
+		</fx:jar>   
+	</target>
+
+</project>

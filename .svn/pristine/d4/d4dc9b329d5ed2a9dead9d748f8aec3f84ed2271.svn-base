@@ -1,0 +1,270 @@
+package msgrouter.engine;
+
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.IOException;
+import java.util.Hashtable;
+
+import msgrouter.api.security.EncryptEnv;
+import msgrouter.api.security.EncryptUtil;
+import msgrouter.constant.Const;
+import msgrouter.engine.config.Config;
+import msgrouter.engine.config.ContainersConfig;
+import msgrouter.engine.config.MainConfig;
+import msgrouter.engine.http.HttpContainer;
+import msgrouter.engine.nosession.NoSessionContainer;
+import msgrouter.engine.socket.SocketContainer;
+
+import org.apache.log4j.Logger;
+
+import elastic.util.ElasticConfigurator;
+import elastic.util.beanmgr.BeanMgr;
+import elastic.util.lifecycle.InstanceSignalHandler;
+import elastic.util.lifecycle.LifeCycle;
+import elastic.util.lifecycle.LifeCycleObject;
+import elastic.util.sqlmgr.SqlConn;
+import elastic.util.sqlmgr.SqlConnPool;
+import elastic.util.sqlmgr.SqlConnPoolManager;
+import elastic.util.util.CommonUtil;
+import elastic.util.util.FilePathUtil;
+import elastic.util.util.FileUtil;
+import elastic.util.util.TechException;
+import elastic.util.xml.XmlReader;
+import elastic.util.xml.XmlUtil;
+
+public class MsgRouter extends LifeCycleObject {
+	private static volatile MsgRouter _instance = null;
+	private static boolean _clientModule = false;
+
+	private final Hashtable<String, Service> svcRegistry;
+	private Config config = null;
+	private Container socContainer = null;
+	private Container httpContainer = null;
+	private Container nosessionContainer = null;
+	private SqlConnPoolManager sqlConnPoolMgr = null;
+	private BeanCache beanCache = new BeanCache();
+
+	private String lockFilePath = null;
+	private FileInputStream lockFileIS = null;
+
+	public static MsgRouter getInstance() {
+		return getInstance(false);
+	}
+
+	public static MsgRouter getInstance(boolean clientModule) {
+		if (_instance == null) {
+			synchronized (MsgRouter.class) {
+				if (_instance == null) {
+					_clientModule = clientModule;
+					_instance = new MsgRouter();
+					_instance.setLifeCyclePathVisible(false);
+				}
+			}
+		}
+		return _instance;
+	}
+
+	private MsgRouter() {
+		super(MsgRouter.class);
+		this.svcRegistry = new Hashtable<String, Service>();
+	}
+
+	public void run() {
+		Logger log = Logger.getLogger(MsgRouter.class);
+
+		try {
+			XmlReader elasticXml = ElasticConfigurator.getXml();
+
+			config = new Config();
+
+			/*
+			 * main configuration
+			 */
+			if (log.isInfoEnabled()) {
+				log.info("configurating " + MainConfig.class.getSimpleName());
+			}
+			MainConfig mainConfig = (MainConfig) BeanMgr.getInstance().get(
+					"mainConfig");
+			config.setMainConfig(mainConfig);
+
+			lock(mainConfig.getDir());
+
+			try {
+				sqlConnPoolMgr = (SqlConnPoolManager) BeanMgr.getInstance()
+						.get(Const.BEAN_SQL_CONN_POOL_MGR);
+			} catch (Exception e) {
+			}
+
+			if (sqlConnPoolMgr != null) {
+				SqlConn sqlConn = null;
+				try {
+					SqlConnPool sqlConnPool = sqlConnPoolMgr
+							.getSqlConnPool(Const.VAL_SQL_CONN_POOL_DEFAULT);
+					if (sqlConnPool == null
+							&& sqlConnPoolMgr.getSqlConnPools().size() > 0) {
+						throw new RuntimeException(
+								"There is no SqlConnPool named '"
+										+ Const.VAL_SQL_CONN_POOL_DEFAULT
+										+ "'.");
+					}
+					sqlConn = sqlConnPool.getSqlConn();
+					if (MRAuthEntryTableUtil.existsTable(sqlConn)) {
+						// MRAuthEntryTableUtil.deleteTable(sqlConn);
+						// MRAuthEntryTableUtil.createTable(sqlConn);
+					} else {
+						MRAuthEntryTableUtil.createTable(sqlConn);
+					}
+				} finally {
+					if (sqlConn != null) {
+						sqlConn.close();
+					}
+				}
+			}
+
+			/*
+			 * container configuration
+			 */
+			if (log.isInfoEnabled()) {
+				log.info("configurating "
+						+ ContainersConfig.class.getSimpleName());
+			}
+			ContainersConfig containersConfig = new ContainersConfig(
+					getContainerConfDir(), getContainerConfText());
+			config.setContainersConfig(containersConfig);
+
+			InstanceSignalHandler.install(this, "TERM");
+			InstanceSignalHandler.install(this, "INT");
+
+			String clTree = BeanMgr.getInstance().getClassLoaderTreeString();
+			if (log.isTraceEnabled()) {
+				log.trace("ClassLoader Tree: " + CommonUtil.NEW_LINE + clTree);
+			}
+
+			if (log.isInfoEnabled()) {
+				log.info("starting containers");
+			}
+			startContainers();
+		} catch (Throwable e) {
+			logError(e);
+			throw new RuntimeException(e);
+		}
+	}
+
+	private void lock(String baseDir) throws TechException {
+		lockFilePath = baseDir + File.separator + ".lock";
+		File lockFile = new File(lockFilePath);
+		if (lockFile.exists()) {
+			if (!FileUtil.removeFile(lockFile)) {
+				throw new TechException(MsgRouter.class.getName()
+						+ " has already started");
+			}
+		}
+		try {
+			FileUtil.makeEmptyFile(lockFilePath);
+			lockFileIS = new FileInputStream(lockFile);
+		} catch (FileNotFoundException e) {
+			throw new TechException(e);
+		}
+	}
+
+	public EncryptUtil getEncryptor(String encryptName) {
+		EncryptEnv ee = config.getMainConfig().getEncryptEnv(encryptName);
+		return EncryptUtil
+				.newEncryptor(ee.getAlgorithm(), ee.getOperationMode(),
+						ee.getPadding(), ee.getKey(), ee.getIV());
+	}
+
+	public EncryptUtil getDecryptor(String encryptName) {
+		EncryptEnv ee = config.getMainConfig().getEncryptEnv(encryptName);
+		return EncryptUtil
+				.newDecryptor(ee.getAlgorithm(), ee.getOperationMode(),
+						ee.getPadding(), ee.getKey(), ee.getIV());
+	}
+
+	private void unlock() {
+		if (lockFileIS != null) {
+			try {
+				lockFileIS.close();
+			} catch (IOException e) {
+			} finally {
+				lockFileIS = null;
+			}
+		}
+		if (lockFilePath != null) {
+			File lockFile = new File(lockFilePath);
+			if (lockFile.exists()) {
+				FileUtil.removeFile(lockFile);
+			}
+			lockFilePath = null;
+		}
+	}
+
+	public void startContainers() throws TechException {
+		if (socContainer != null) {
+			socContainer.currentLifeCycle().killNow();
+		}
+		socContainer = SocketContainer.getInstance(config, _clientModule);
+		new LifeCycle(socContainer, "socCntnr", this).start();
+
+		if (httpContainer != null) {
+			httpContainer.currentLifeCycle().killNow();
+		}
+		httpContainer = HttpContainer.getInstance(config);
+		new LifeCycle(httpContainer, "httpCntnr", this).start();
+
+		if (nosessionContainer != null) {
+			nosessionContainer.currentLifeCycle().killNow();
+		}
+		nosessionContainer = NoSessionContainer.getInstance(config);
+		new LifeCycle(nosessionContainer, "noSsCntnr", this).start();
+	}
+
+	public Config getConfig() {
+		return config;
+	}
+
+	public BeanCache getBeanCache() {
+		return beanCache;
+	}
+
+	public SqlConnPoolManager getSqlConnPoolManager() {
+		return sqlConnPoolMgr;
+	}
+
+	public SqlConnPool getSqlConnPool(String sqlConnPoolName) {
+		return sqlConnPoolMgr != null ? sqlConnPoolMgr
+				.getSqlConnPool(sqlConnPoolName) : null;
+	}
+
+	public void registerService(String svcId, Service svc) {
+		svcRegistry.put(svcId, svc);
+	}
+
+	public void deregisterService(String svcId) {
+		svcRegistry.remove(svcId);
+	}
+
+	public Service getService(String svcId) {
+		return svcRegistry.get(svcId);
+	}
+
+	public void killEventHandler() {
+		unlock();
+	}
+
+	public boolean isBusy() {
+		return false;
+	}
+
+	public String getContainerConfDir() {
+		return FilePathUtil.getBasePath(new File(config.getMainConfig()
+				.getContainerConfigPath()));
+	}
+
+	public String getContainerConfText() throws IOException {
+		String path = config.getMainConfig().getContainerConfigPath();
+		String encoding = XmlUtil.getEncoding(new File(path));
+		return FileUtil.fileToString(path, encoding);
+	}
+}

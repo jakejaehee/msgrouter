@@ -1,0 +1,30 @@
+package msgrouter.engine.com.workerthread;
+
+import msgrouter.api.SyncQueue;
+import msgrouter.api.interfaces.bean.SyncBean;
+import msgrouter.engine.Session;
+import elastic.util.queue.QueueTimeoutException;
+import elastic.util.util.TechException;
+
+public class SyncBeanRunnerThr implements Runnable {
+	private final Session ss;
+	private final Runnable workerThr;
+	private final SyncBean syncBean;
+
+	public SyncBeanRunnerThr(Session ss, Runnable workerThr, SyncBean syncBean) {
+		this.ss = ss;
+		this.workerThr = workerThr;
+		this.syncBean = syncBean;
+	}
+
+	public void run() {
+		try {
+			ss.logTrace(syncBean.getClass().getName() + ".execute()");
+			syncBean._execute(new SyncQueue(ss, workerThr, syncBean));
+		} catch (QueueTimeoutException e) {
+			ss.logError(e);
+		} catch (TechException e) {
+			ss.logError(e);
+		}
+	}
+}

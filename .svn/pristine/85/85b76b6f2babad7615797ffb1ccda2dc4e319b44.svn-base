@@ -1,0 +1,15 @@
+package msgrouter.engine;
+
+import elastic.util.ElasticConfigurator;
+import elastic.util.lifecycle.LifeCycle;
+import elastic.util.util.TechException;
+
+public class Main {
+	public static void main(String[] args) throws TechException {
+		String elasticXml = System.getProperty("elasticXml");
+		ElasticConfigurator.init(elasticXml);
+
+		MsgRouter msgrouter = MsgRouter.getInstance();
+		new LifeCycle(msgrouter).start();
+	}
+}

@@ -1,0 +1,342 @@
+package msgrouter.engine.config.rule;
+
+import java.io.File;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+import msgrouter.api.interfaces.bean.AsyncBean;
+import msgrouter.api.interfaces.bean.Marshal;
+import msgrouter.api.interfaces.bean.SentTrigger;
+import msgrouter.api.interfaces.bean.SyncBean;
+import msgrouter.constant.Const;
+import msgrouter.engine.MsgRouter;
+import msgrouter.engine.Service;
+import msgrouter.engine.com.workerthread.NoSessionCronjob;
+import msgrouter.engine.com.workerthread.SessionCronjob;
+import msgrouter.engine.config.ServiceConfig;
+import msgrouter.engine.event.EventInitProcMap;
+
+import org.apache.log4j.Logger;
+import org.dom4j.Node;
+
+import elastic.util.java.ReflectionUtil;
+import elastic.util.queue.QueueTimeoutException;
+import elastic.util.scheduler.Schedule;
+import elastic.util.scheduler.Scheduler;
+import elastic.util.util.ExceptionDetail;
+import elastic.util.util.FilePathUtil;
+import elastic.util.util.FileWatchdog;
+import elastic.util.util.FileWatchdogCallback;
+import elastic.util.util.TechException;
+import elastic.util.xml.XmlReader;
+import elastic.util.xml.XmlUtil;
+
+public class ProcessMap implements FileWatchdogCallback {
+	private static final Logger LOG = Logger.getLogger(ProcessMap.class);
+
+	public static final String CONF_SERVICE = "service";
+	public static final String CONF_ID = "id";
+	public static final String CONF_MARSHAL_CLASS = "marshalClass";
+	public static final String CONF_CRONJOB = "cronjob";
+	public static final String CONF_BEAN = "bean";
+	public static final String CONF_CLASS = "class";
+	public static final String CONF_TIME_TABLE = "timeTable";
+	public static final String CONF_RETURN = "return";
+	public static final String CONF_SWITCH_TO = "switchTo";
+	public static final String CONF_SENT_TRIGGER = "sentTrigger";
+	public static final String CONF_MSG_TYPE = "messageType";
+	public static final String CONF_MESSAGE = "message";
+	public static final String CONF_NOSESSION_CRONJOBS = "nosessionCronjobs";
+	public static final String CONF_SESSION_CRONJOBS = "sessionCronjobs";
+
+	private boolean firstTime = true;
+	private final ServiceConfig svcConf;
+	private final String filepath;
+	private final ClassLoader classLoader;
+	private Map<String, MessageRule> msgRuleMap = null;
+	private MessageRule wildcardMsgRule = null;
+	private List<CronjobRules> cronjobRulesList = null;
+	private FileWatchdog watchdog = null;
+
+	public ProcessMap(ServiceConfig svcConf, String filepath,
+			boolean autoReload, ClassLoader classLoader) throws TechException,
+			QueueTimeoutException {
+		this.svcConf = svcConf;
+		this.msgRuleMap = new HashMap<String, MessageRule>();
+		this.wildcardMsgRule = new MessageRule(Const.VAL_MSG_TYPE_WILDCARD);
+		this.cronjobRulesList = new ArrayList<CronjobRules>();
+		this.classLoader = classLoader;
+		this.filepath = FilePathUtil.adaptPath(filepath);
+
+		if (LOG.isDebugEnabled()) {
+			LOG.debug("Initializaing processMap");
+		}
+
+		clear();
+
+		if (autoReload) {
+			this.watchdog = new FileWatchdog(4000);
+			this.watchdog.start();
+		}
+
+		init();
+	}
+
+	private void init() throws TechException, QueueTimeoutException {
+		if (LOG.isDebugEnabled()) {
+			try {
+				LOG.debug("loading processMap: "
+						+ new File(filepath).getCanonicalPath());
+			} catch (Exception e) {
+				LOG.error(ExceptionDetail.getDetail(e));
+			}
+		}
+
+		XmlReader xml = new XmlReader(new File(filepath));
+
+		Node processNode = xml.getNode("/processMap");
+		List childs = XmlUtil.getChildElements(processNode);
+		parseProcessMapNode(childs);
+
+		if (!firstTime) {
+			Service svc = MsgRouter.getInstance().getService(
+					svcConf.getServiceId());
+			svc.putEvent(new EventInitProcMap());
+		}
+
+		if (firstTime) {
+			if (this.watchdog != null) {
+				this.watchdog.watch(this, filepath);
+			}
+			firstTime = false;
+		}
+	}
+
+	private void parseProcessMapNode(List processMapChildList)
+			throws TechException {
+		if (LOG.isDebugEnabled()) {
+			LOG.debug("parsing processMap node..");
+		}
+		for (int i = 0; processMapChildList != null
+				&& i < processMapChildList.size(); i++) {
+			Node child = (Node) processMapChildList.get(i);
+			if (child.getName().equals(CONF_MESSAGE)) {
+				Node msgNode = child;
+				MessageRule msgRule = parseMessageNode(svcConf.getServiceId(),
+						msgNode);
+				setMessageRule(msgRule.getMessageType(), msgRule);
+
+				if (LOG.isDebugEnabled())
+					LOG.debug("parsed: " + msgRule.toString());
+
+			} else if (child.getName().equals(CONF_NOSESSION_CRONJOBS)) {
+				Node cronjobNode = child;
+				CronjobRules cronjobRules = parseCronjobNode(cronjobNode,
+						NoSessionCronjob.class);
+				addCronjobRules(cronjobRules);
+				if (LOG.isDebugEnabled()) {
+					LOG.debug("parsed: " + cronjobRules.toString());
+				}
+			} else if (child.getName().equals(CONF_SESSION_CRONJOBS)) {
+				Node cronjobNode = child;
+				CronjobRules cronjobRules = parseCronjobNode(cronjobNode,
+						SessionCronjob.class);
+				addCronjobRules(cronjobRules);
+				if (LOG.isDebugEnabled()) {
+					LOG.debug("parsed: " + cronjobRules.toString());
+				}
+			}
+		}
+	}
+
+	public void fileModifiedHandler() throws Exception {
+		init();
+	}
+
+	private MessageRule parseMessageNode(String svcId, Node msgNode)
+			throws TechException {
+		String msgType = XmlUtil
+				.getAttributeStringValue(msgNode, CONF_MSG_TYPE);
+
+		if (LOG.isDebugEnabled())
+			LOG.debug("Initializing message rule for message type " + msgType
+					+ "...");
+
+		MessageRule msgRule = new MessageRule(msgType);
+		msgRule.setServiceId(svcId);
+
+		List childs = XmlUtil.getChildElements(msgNode);
+		for (int i = 0; childs != null && i < childs.size(); i++) {
+			Node msgChild = (Node) childs.get(i);
+			if (msgChild.getName().equals(CONF_BEAN)) {
+				InvokeRule invokeRule = parseInvokeRule(msgChild);
+				msgRule.addInvokeRule(invokeRule);
+
+			}
+		}
+
+		RoutingRules routingRules = parseRoutingRules(msgType, msgNode);
+		msgRule.setRoutingRules(routingRules);
+
+		if (LOG.isDebugEnabled())
+			LOG.debug("Initializing message rule for message type " + msgType
+					+ " has done");
+
+		return msgRule;
+	}
+
+	private CronjobRules parseCronjobNode(Node cronjobsNode, Class cronjobClass)
+			throws TechException {
+		CronjobRules cronjobRules = new CronjobRules(cronjobClass);
+		cronjobRules.setServiceId(svcConf.getServiceId());
+
+		List cronjobList = XmlUtil.getChildElements(cronjobsNode);
+		for (int i = 0; cronjobList != null && i < cronjobList.size(); i++) {
+			Node cronjob = (Node) cronjobList.get(i);
+			if (cronjob.getName().equals(CONF_CRONJOB)) {
+				InvokeRule invokeRule = parseInvokeRule(cronjob);
+				cronjobRules.addInvokeRules(invokeRule);
+			}
+		}
+		return cronjobRules;
+	}
+
+	private InvokeRule parseInvokeRule(Node invokeNode) throws TechException {
+		try {
+			String beanClassName = XmlUtil.getAttributeStringValue(invokeNode,
+					CONF_CLASS);
+			Class beanClass = Class.forName(beanClassName, true, classLoader);
+			if (!ReflectionUtil.isCastable(beanClass, AsyncBean.class)
+					&& !ReflectionUtil.isCastable(beanClass, SyncBean.class)) {
+				throw new TechException(beanClass.getName() + " is not a "
+						+ AsyncBean.class.getName() + " nor "
+						+ SyncBean.class.getName());
+			}
+
+			boolean isSynchronized = XmlUtil.getAttributeBooleanValue(
+					invokeNode, "synchronized");
+
+			InvokeRule invokeRule = new InvokeRule(beanClass, isSynchronized);
+
+			List childs = XmlUtil.getChildElements(invokeNode);
+			for (int i = 0; childs != null && i < childs.size(); i++) {
+				Node invokeChild = (Node) childs.get(i);
+				if (invokeChild.getName().equals(CONF_TIME_TABLE)) {
+					List<Schedule> schList = Scheduler
+							.parseTimeTableNode(invokeChild);
+					invokeRule.setScheduleList(schList);
+
+				} else if (invokeChild.getName().equals(CONF_RETURN)) {
+					String msgType = XmlUtil.getAttributeStringValue(
+							invokeChild, CONF_MSG_TYPE);
+					RoutingRules routingRules = parseRoutingRules(msgType,
+							invokeChild);
+					invokeRule.setRoutingRules(msgType, routingRules);
+				}
+			}
+			return invokeRule;
+		} catch (ClassNotFoundException e) {
+			throw new TechException(e);
+		}
+	}
+
+	private RoutingRules parseRoutingRules(String msgType, Node node)
+			throws TechException {
+		RoutingRules routingRules = new RoutingRules(msgType);
+
+		String sentTriggerClassName = XmlUtil.getAttributeStringValue(node,
+				CONF_SENT_TRIGGER, CONF_CLASS);
+		if (sentTriggerClassName != null) {
+			try {
+				Class sentTriggerClass = Class.forName(sentTriggerClassName,
+						true, classLoader);
+				if (!ReflectionUtil.isCastable(sentTriggerClass,
+						SentTrigger.class)) {
+					throw new TechException(sentTriggerClass.getName()
+							+ " is not a " + SentTrigger.class.getName());
+				}
+				routingRules.setSentTriggerClass(sentTriggerClass);
+			} catch (ClassNotFoundException e) {
+				throw new TechException(e);
+			}
+		}
+
+		List childs = XmlUtil.getChildElements(node);
+		for (int i = 0; childs != null && i < childs.size(); i++) {
+			Node child = (Node) childs.get(i);
+			if (child.getName().equals(CONF_SWITCH_TO)) {
+				SwitchTo switchTo = new SwitchTo();
+				try {
+					String dstSvcId = XmlUtil.getAttributeStringValue(child,
+							CONF_SERVICE);
+					switchTo.setServiceId(dstSvcId);
+				} catch (Throwable e) {
+					LOG.error(ExceptionDetail.getDetail(e));
+				}
+
+				try {
+					String marshalClassName = XmlUtil.getAttributeStringValue(
+							child, CONF_MARSHAL_CLASS);
+					if (marshalClassName != null
+							&& !"".equals(marshalClassName)
+							&& !"null".equals(marshalClassName)) {
+						try {
+							Class marshalClass = Class.forName(
+									marshalClassName, true, classLoader);
+							if (!ReflectionUtil.isCastable(marshalClass,
+									Marshal.class)) {
+								throw new TechException(marshalClass.getName()
+										+ " is not a "
+										+ Marshal.class.getName());
+							}
+							switchTo.setMarshalClass(marshalClass);
+						} catch (ClassNotFoundException e) {
+							throw new TechException(e);
+						}
+					}
+				} catch (Throwable e) {
+					LOG.error(ExceptionDetail.getDetail(e));
+				}
+				routingRules.addSwitchTo(switchTo);
+			}
+		}
+
+		return routingRules;
+	}
+
+	public void setMessageRule(String msgType, MessageRule msgRule) {
+		if (Const.VAL_MSG_TYPE_WILDCARD.equals(msgType)) {
+			wildcardMsgRule = msgRule;
+		} else {
+			msgRuleMap.put(msgType, msgRule);
+		}
+	}
+
+	public MessageRule getMessageRule(String msgType) {
+		if (Const.VAL_MSG_TYPE_WILDCARD.equals(msgType)) {
+			return wildcardMsgRule;
+		} else {
+			MessageRule rule = msgRuleMap.get(msgType);
+			if (rule != null) {
+				return rule;
+			} else {
+				return wildcardMsgRule;
+			}
+		}
+	}
+
+	public void addCronjobRules(CronjobRules cronjobRules) {
+		cronjobRulesList.add(cronjobRules);
+	}
+
+	public List<CronjobRules> getCronjobRulesList() {
+		return cronjobRulesList;
+	}
+
+	public void clear() {
+		if (LOG.isDebugEnabled())
+			LOG.debug("clearing ProcessMap...");
+	}
+}

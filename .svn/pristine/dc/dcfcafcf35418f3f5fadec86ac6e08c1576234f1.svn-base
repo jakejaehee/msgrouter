@@ -1,0 +1,78 @@
+package msgrouter.engine.com.workerthread;
+
+import msgrouter.api.QueueEntry;
+import msgrouter.api.interfaces.bean.AsyncBean;
+import msgrouter.engine.NoSession;
+import msgrouter.engine.Router;
+import msgrouter.engine.Service;
+import msgrouter.engine.Session;
+import msgrouter.engine.config.rule.InvokeRule;
+import msgrouter.engine.config.rule.RoutingRules;
+import elastic.util.lifecycle.LifeCycleObject;
+import elastic.util.queue.QueueTimeoutException;
+import elastic.util.util.TechException;
+
+public class AsyncBeanOnCronjobInvoker {
+	private final Service svc;
+	private final LifeCycleObject lco;
+	private final InvokeRule invokeRule;
+	private final AsyncBean asyncBean;
+
+	public AsyncBeanOnCronjobInvoker(Service svc, LifeCycleObject lco,
+			InvokeRule invokeRule, AsyncBean asyncBean) {
+		this.svc = svc;
+		this.lco = lco;
+		this.invokeRule = invokeRule;
+		this.asyncBean = asyncBean;
+	}
+
+	public boolean isRepeatable() {
+		return asyncBean.isRepeatableOnCronjob();
+	}
+
+	public void execute() throws TechException, QueueTimeoutException {
+		if (lco instanceof Session) {
+			if (((Session) lco).isClosed()) {
+				asyncBean.stopRepeatableOnCronjob();
+				return;
+			}
+		}
+		if (asyncBean.getLastTimeOnCronjob() > 0
+				&& System.currentTimeMillis()
+						- asyncBean.getLastTimeOnCronjob() < asyncBean
+							.getRepeatIntervalOnCronjob()) {
+			return;
+		}
+		lco.logTrace(asyncBean.getClass().getName() + ": "
+				+ AsyncBean.class.getSimpleName() + ".onCronjob()");
+
+		QueueEntry oqe = asyncBean._onCronjob();
+
+		if (oqe != null) {
+			if (lco instanceof Session) {
+				oqe.setReqres(QueueEntry.IVAL_REQ_SESSION_CRONJOB);
+				oqe.setSrcId(((Session) lco).getLoginId());
+				oqe.setSrcIp(((Session) lco).getRemoteIp());
+				oqe.setSrcSessionName(((Session) lco).getAlias());
+			} else if (lco instanceof NoSession) {
+				oqe.setReqres(QueueEntry.IVAL_REQ_NOSESSION_CRONJOB);
+			}
+
+			RoutingRules routingRules = invokeRule.getRoutingRules(oqe
+					.getMessageType());
+			if (routingRules != null
+					&& routingRules.getSentTriggerClass() != null) {
+				oqe.setSentTriggerClass(routingRules.getSentTriggerClass());
+			}
+
+			if (lco instanceof Session) {
+				Router.sendTo(oqe, svc, ((Session) lco));
+				Router.switchTo(oqe, svc, ((Session) lco), routingRules);
+			} else {
+				// Comment out by Jake Lee, 2015-08-17
+				// Router.sendTo(oqe, svc, null);
+				Router.switchTo(oqe, svc, null, routingRules);
+			}
+		}
+	}
+}

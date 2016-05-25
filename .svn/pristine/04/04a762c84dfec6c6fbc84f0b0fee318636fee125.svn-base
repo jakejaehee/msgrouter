@@ -1,0 +1,268 @@
+package msgrouter.admin.server.ws;
+
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+
+import msgrouter.constant.Const;
+import msgrouter.engine.MsgRouter;
+import msgrouter.engine.Service;
+import msgrouter.engine.config.ContainersConfig;
+import msgrouter.engine.config.ServiceConfig;
+
+import org.apache.log4j.Logger;
+
+import elastic.util.queue.Queue;
+import elastic.util.queue.QueueParams;
+import elastic.util.util.FileUtil;
+import elastic.util.util.TechException;
+import elastic.web.dataset.WebRow;
+
+public class ServiceMgmtWS {
+	private static final Logger LOG = Logger.getLogger(ServiceMgmtWS.class);
+
+	public void saveSocketServerService(String id, String desc, String port,
+			String loginRequired, String users, String groups,
+			String recverClassName, String senderClassName,
+			String conn_encoding, int conn_recvTimeoutMillis,
+			String maxSessions, String queue_fileEnabled) throws TechException {
+		try {
+			ContainersConfig containerConf = new ContainersConfig(MsgRouter
+					.getInstance().getContainerConfDir(), MsgRouter
+					.getInstance().getContainerConfText());
+			ServiceConfig svcConf = containerConf.getServiceConfig(id);
+			if (svcConf == null) {
+				// svcConf = new ServiceConfig(Const.CONF_CONTAINER_SOCKET,
+				// ServiceConfig.SVAL_SVC_TYPE_SERVER, id, "", null);
+				// containerConf.addSocketServiceConfig(svcConf);
+			}
+			svcConf.setServerPort(Integer.parseInt(port));
+			svcConf.setUserIds(users.split(","));
+			svcConf.setGroupIds(groups.split(","));
+			svcConf.setRecverClassName(recverClassName);
+			svcConf.setSenderClassName(senderClassName);
+			Map props = svcConf.getConnectionProps();
+			if (conn_encoding != null && !"".equals(conn_encoding)) {
+				props.put("encoding", conn_encoding);
+			}
+			if (conn_recvTimeoutMillis > 0) {
+				props.put("recvTimeoutMillis", conn_recvTimeoutMillis);
+			}
+
+			QueueParams globalQP = MsgRouter.getInstance().getConfig()
+					.getMainConfig().getGlobalQueueParams();
+			if (globalQP != null) {
+				svcConf.getQueueParams().setUndefinedAttributes(globalQP);
+			} else {
+				svcConf.getQueueParams().setUndefinedAttributes(
+						ServiceConfig.getDefaultQueueParams());
+			}
+			QueueParams qp = svcConf.getQueueParams();
+			if ("true".equalsIgnoreCase(queue_fileEnabled)) {
+				qp.setQueueType(Queue.QTYPE_FILE);
+			} else {
+				qp.setQueueType(Queue.QTYPE_MEMORY);
+			}
+
+			String path = MsgRouter.getInstance().getConfig().getMainConfig()
+					.getContainerConfigPath();
+			FileUtil.makeTextFile(path, containerConf.toText(),
+					containerConf.getEncoding());
+		} catch (IOException e) {
+			throw new TechException(e);
+		}
+	}
+
+	public void deleteSocketService(String id) throws TechException {
+		try {
+			ContainersConfig containerConf = new ContainersConfig(MsgRouter
+					.getInstance().getContainerConfDir(), MsgRouter
+					.getInstance().getContainerConfText());
+			containerConf.deleteServiceConfig(id);
+
+			String path = MsgRouter.getInstance().getConfig().getMainConfig()
+					.getContainerConfigPath();
+			FileUtil.makeTextFile(path, containerConf.toText(),
+					containerConf.getEncoding());
+		} catch (IOException e) {
+			throw new TechException(e);
+		}
+	}
+
+	public List<Map> getSocketServerServiceList() throws TechException {
+		return getServiceList(Const.CONF_CONTAINER_SOCKET,
+				Service.IVAL_SVC_TYPE_SERVER);
+	}
+
+	public List<Map> getSocketClientServiceList() throws TechException {
+		return getServiceList(Const.CONF_CONTAINER_SOCKET,
+				Service.IVAL_SVC_TYPE_CLIENT);
+	}
+
+	public List<Map> getHttpServerServiceList() throws TechException {
+		return getServiceList(Const.CONF_CONTAINER_HTTP,
+				Service.IVAL_SVC_TYPE_SERVER);
+
+	}
+
+	public List<Map> getHttpClientServiceList() throws TechException {
+		return getServiceList(Const.CONF_CONTAINER_HTTP,
+				Service.IVAL_SVC_TYPE_CLIENT);
+
+	}
+
+	public List<Map> getApplicationServiceList() throws TechException {
+		return getServiceList(Const.CONF_CONTAINER_NOSESSION, (short) -1);
+	}
+
+	private List<Map> getServiceList(String containerType, short svcType)
+			throws TechException {
+		try {
+			ContainersConfig containerConf = new ContainersConfig(MsgRouter
+					.getInstance().getContainerConfDir(), MsgRouter
+					.getInstance().getContainerConfText());
+
+			List<String> svcIdList = containerConf.getServiceIdList(
+					containerType, svcType);
+
+			List<Map> records = new ArrayList<Map>();
+			for (int i = 0; i < svcIdList.size(); i++) {
+				String svcId = svcIdList.get(i);
+				ServiceConfig svcConf = containerConf.getServiceConfig(svcId);
+
+				Map record = new WebRow();
+				record.put("id", svcId);
+				record.put("description", svcConf.getDescription());
+
+				records.add(record);
+			}
+			return records;
+		} catch (IOException e) {
+			throw new TechException(e);
+		}
+	}
+
+	public Map getSocketServiceBrief(String svcId) throws TechException {
+		return getServiceBrief(Const.CONF_CONTAINER_SOCKET, svcId);
+	}
+
+	public Map getHttpServiceBrief(String svcId) throws TechException {
+		return getServiceBrief(Const.CONF_CONTAINER_HTTP, svcId);
+	}
+
+	public Map getApplicationServiceBrief(String svcId) throws TechException {
+		return getServiceBrief(Const.CONF_CONTAINER_NOSESSION, svcId);
+	}
+
+	public Map getServiceBrief(String containerType, String svcId)
+			throws TechException {
+		try {
+			ContainersConfig containerConf = new ContainersConfig(MsgRouter
+					.getInstance().getContainerConfDir(), MsgRouter
+					.getInstance().getContainerConfText());
+			ServiceConfig svcConf = containerConf.getServiceConfig(svcId);
+
+			Map record = new WebRow();
+			record.put("id", svcId);
+			record.put("description", svcConf.getDescription());
+			record.put(ServiceConfig.SERVER_PORT, svcConf.getServerPort());
+			record.put("recverClassName", svcConf.getRecverClass().getName());
+			record.put("senderClassName", svcConf.getSenderClass().getName());
+			record.put("conn_encoding",
+					svcConf.getConnectionProps().get("encoding"));
+			record.put("conn_recvTimeoutMillis", svcConf.getConnectionProps()
+					.get("recvTimeoutMillis"));
+
+			record.put(ServiceConfig.MIN_ACCEPT_THRS,
+					svcConf.getMinAcceptThrs());
+			record.put(ServiceConfig.MIN_TRANS_THRS,
+					svcConf.getMinTransferThrs());
+			record.put(ServiceConfig.MAX_SESSIONS_PER_TRANS_THR,
+					svcConf.getMaxSessionsPerTransferThr());
+			record.put(ServiceConfig.MIN_BEAN_THRS, svcConf.getMinBeanThrs());
+			record.put(ServiceConfig.MAX_SESSIONS_PER_BEAN_THR,
+					svcConf.getMaxSessionsPerBeanThr());
+
+			if (svcConf.getQueueParams().getQueueType() == Queue.QTYPE_FILE) {
+				record.put("queue_fileEnabled", true);
+			} else {
+				record.put("queue_fileEnabled", false);
+			}
+			return record;
+		} catch (IOException e) {
+			throw new TechException(e);
+		}
+	}
+
+	public List<Map> getSocketServiceUserIds(String svcId) throws TechException {
+		return getServiceUserIds(Const.CONF_CONTAINER_SOCKET, svcId);
+	}
+
+	public List<Map> getHttpServiceUserIds(String svcId) throws TechException {
+		return getServiceUserIds(Const.CONF_CONTAINER_HTTP, svcId);
+	}
+
+	public List<Map> getApplicationServiceUserIds(String svcId)
+			throws TechException {
+		return getServiceUserIds(Const.CONF_CONTAINER_NOSESSION, svcId);
+	}
+
+	public List<Map> getSocketServiceGroupIds(String svcId)
+			throws TechException {
+		return getServiceGroupIds(Const.CONF_CONTAINER_SOCKET, svcId);
+	}
+
+	public List<Map> getHttpServiceGroupIds(String svcId) throws TechException {
+		return getServiceGroupIds(Const.CONF_CONTAINER_HTTP, svcId);
+	}
+
+	public List<Map> getApplicationServiceGroupIds(String svcId)
+			throws TechException {
+		return getServiceGroupIds(Const.CONF_CONTAINER_NOSESSION, svcId);
+	}
+
+	public List<Map> getServiceUserIds(String containerType, String svcId)
+			throws TechException {
+		try {
+			ContainersConfig containerConf = new ContainersConfig(MsgRouter
+					.getInstance().getContainerConfDir(), MsgRouter
+					.getInstance().getContainerConfText());
+			ServiceConfig svcConf = containerConf.getServiceConfig(svcId);
+
+			List<Map> records = new ArrayList<Map>();
+
+			String[] userIds = svcConf.getUserIds();
+			for (int i = 0; userIds != null && i < userIds.length; i++) {
+				Map record = new WebRow();
+				record.put("userId", userIds[i]);
+				records.add(record);
+			}
+			return records;
+		} catch (IOException e) {
+			throw new TechException(e);
+		}
+	}
+
+	public List<Map> getServiceGroupIds(String containerType, String svcId)
+			throws TechException {
+		try {
+			ContainersConfig containerConf = new ContainersConfig(MsgRouter
+					.getInstance().getContainerConfDir(), MsgRouter
+					.getInstance().getContainerConfText());
+			ServiceConfig svcConf = containerConf.getServiceConfig(svcId);
+
+			List<Map> records = new ArrayList<Map>();
+
+			String[] groupIds = svcConf.getGroupIds();
+			for (int i = 0; groupIds != null && i < groupIds.length; i++) {
+				Map record = new WebRow();
+				record.put("groupId", groupIds[i]);
+				records.add(record);
+			}
+			return records;
+		} catch (IOException e) {
+			throw new TechException(e);
+		}
+	}
+}

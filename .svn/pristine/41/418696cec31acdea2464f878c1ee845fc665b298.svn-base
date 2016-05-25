@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<containers>
+	<!--
+	    container type: socket, http, nosession
+	    service type: server, client, nosession 
+	 -->
+	<container type="socket">
+		<service type="server" 
+			id="mstSender" 
+			description="Master Sender (Server)" 
+			path="../service/mstSender" 
+			classpath="../service/classes" />
+
+		<service type="server" 
+			id="ordRecver" 
+			description="Order Recver (Server)" 
+			path="../service/ordRecver"
+			classpath="../service/classes" />
+
+		<service type="server" 
+			id="sqlExecutor" 
+			description="SQL Executor (Server)" 
+			path="../service/sqlExecutor"
+			classpath="../service/classes" />
+
+		<service type="server" 
+			id="test" 
+			description="Test (Server)" 
+			path="../service/test"
+			classpath="../service/classes" />
+	</container>
+
+	<container type="nosession">
+		<service type="nosession" 
+			id="app" 
+			description="Applications" 
+			path="../service/app" 
+ 			classpath="../service/classes" />
+	</container>
+</containers>

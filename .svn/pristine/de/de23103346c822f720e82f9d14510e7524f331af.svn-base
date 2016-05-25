@@ -1,0 +1,197 @@
+package msgrouter.api;
+
+import java.io.Serializable;
+import java.util.ArrayList;
+import java.util.List;
+
+import msgrouter.api.interfaces.Message;
+
+public class QueueEntry implements Serializable {
+	private static final long serialVersionUID = -8804731401324238917L;
+
+	transient public static final short IVAL_REQ_SESSION_CRONJOB = 1;
+	transient public static final short IVAL_REQ_NOSESSION_CRONJOB = 2;
+	transient public static final short IVAL_REQ_SESSION_IN = 3;
+	transient public static final short IVAL_RES_SESSION_BEAN_THR = 4;
+	transient public static final short IVAL_RES_NOSESSION_BEAN_THR = 5;
+
+	transient public static final String MAP_MSG_KEY_createdTime = "_createdTime";
+
+	private long createdTime;
+	private String srcId = null;
+	private String srcIp = null;
+	private String srcSessionName = null;
+	private String dstId = null;
+	private String dstIp = null;
+	private String dstSessionName = null;
+	private String exception = null;
+
+	private short reqres = 0;
+	private Class sentTriggerClass = null;
+
+	private List<Message> msgList = null;
+
+	public QueueEntry() {
+		this.createdTime = System.currentTimeMillis();
+	}
+
+	public void copyMetaInfoFrom(QueueEntry src) {
+		if (src != null) {
+			exception = src.getException();
+			createdTime = src.getCreatedTime();
+			srcId = src.getSrcId();
+			srcSessionName = src.getSrcSessionName();
+			dstId = src.getDstId();
+			dstSessionName = src.getDstSessionName();
+
+			reqres = src.getReqres();
+			sentTriggerClass = src.getSentTriggerClass();
+		}
+	}
+
+	public void addMessage(Message msg) {
+		if (msg != null) {
+			if (msgList == null) {
+				msgList = new ArrayList<Message>();
+			}
+			msgList.add(msg);
+
+			setDstId(msg.getDstId());
+			setDstIp(msg.getDstIp());
+		}
+	}
+
+	public Message getMessage(int idx) {
+		if (msgList == null)
+			return null;
+		return idx >= 0 && idx < msgList.size() ? msgList.get(idx) : null;
+	}
+
+	public Serializable removeMessage(int idx) {
+		if (msgList == null)
+			return null;
+		return idx >= 0 && idx < msgList.size() ? msgList.remove(idx) : null;
+	}
+
+	public int getMessageCount() {
+		return msgList != null ? msgList.size() : 0;
+	}
+
+	public String getMessageType() {
+		Message msg = getMessage(0);
+		return msg != null ? msg.getMessageType() : null;
+	}
+
+	public void setException(Exception exception) {
+		if (exception != null) {
+			this.exception = exception.getMessage();
+			if (this.exception == null) {
+				this.exception = exception.toString();
+			}
+		}
+	}
+
+	public void setException(String exception) {
+		this.exception = exception;
+	}
+
+	public String getException() {
+		return exception;
+	}
+
+	public void setReqres(short reqres) {
+		this.reqres = reqres;
+	}
+
+	public short getReqres() {
+		return reqres;
+	}
+
+	public void setSrcId(String srcId) {
+		this.srcId = srcId;
+	}
+
+	public String getSrcId() {
+		return srcId;
+	}
+
+	public void setSrcIp(String srcIp) {
+		this.srcIp = srcIp;
+	}
+
+	public String getSrcIp() {
+		return srcIp;
+	}
+
+	public void setSrcSessionName(String srcSessionName) {
+		this.srcSessionName = srcSessionName;
+	}
+
+	public String getSrcSessionName() {
+		return srcSessionName;
+	}
+
+	public void setDstId(String dstId) {
+		this.dstId = dstId;
+	}
+
+	public String getDstId() {
+		return dstId;
+	}
+
+	public void setDstIp(String dstIp) {
+		this.dstIp = dstIp;
+	}
+
+	public String getDstIp() {
+		return dstIp;
+	}
+
+	public void setDstSessionName(String dstSessionName) {
+		this.dstSessionName = dstSessionName;
+	}
+
+	public String getDstSessionName() {
+		return dstSessionName;
+	}
+
+	/**
+	 * 생성일시
+	 * 
+	 * @return
+	 */
+	public long getCreatedTime() {
+		return createdTime;
+	}
+
+	public void setSentTriggerClass(Class sentTriggerClass) {
+		this.sentTriggerClass = sentTriggerClass;
+	}
+
+	public Class getSentTriggerClass() {
+		return sentTriggerClass;
+	}
+
+	/**
+	 * 간략 정보
+	 * 
+	 * @return
+	 */
+	public String getBriefing() {
+		return "type=" + getMessageType() + ", created=" + createdTime;
+	}
+
+	public String getMessageString() {
+		if (msgList == null || msgList.size() == 0) {
+			return "";
+		} else if (msgList.size() == 1) {
+			return msgList.get(0).toString();
+		} else {
+			return msgList.toString();
+		}
+	}
+
+	public String toString() {
+		return MessageUtil.toString(this);
+	}
+}

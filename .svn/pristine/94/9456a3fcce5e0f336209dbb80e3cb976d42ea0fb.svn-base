@@ -1,0 +1,17 @@
+package msgrouter.engine.socket.server.impl;
+
+import java.io.IOException;
+import java.nio.channels.SelectionKey;
+
+import msgrouter.engine.Service;
+import msgrouter.engine.socket.server.Acceptor;
+import msgrouter.engine.socket.server.SelectorEventHandler;
+import msgrouter.engine.socket.server.SelectorThr;
+
+public final class AcceptSelectorEventHandler implements SelectorEventHandler {
+	public boolean processSelectionKey(Service svc, SelectorThr selThread,
+			SelectionKey key) throws IOException {
+		((Acceptor) key.attachment()).tryToAccept(selThread, key);
+		return true;
+	}
+}

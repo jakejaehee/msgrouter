@@ -1,0 +1,196 @@
+package msgrouter.engine.socket.server;
+
+import java.io.IOException;
+import java.net.InetAddress;
+import java.net.InetSocketAddress;
+import java.net.ServerSocket;
+import java.nio.channels.ServerSocketChannel;
+import java.nio.channels.SocketChannel;
+import java.util.IdentityHashMap;
+import java.util.Iterator;
+import java.util.Map;
+
+import msgrouter.engine.Container;
+import msgrouter.engine.Service;
+import msgrouter.engine.config.ContainersConfig.ServiceBootstrapConfig;
+import msgrouter.engine.event.Event;
+import msgrouter.engine.event.EventInitProcMap;
+import msgrouter.engine.socket.server.impl.AcceptSelectorEventHandler;
+import msgrouter.engine.socket.server.impl.ServerSessionFactory;
+import msgrouter.engine.socket.server.impl.TransferSelectorEventHandler;
+import elastic.util.lifecycle.LifeCycle;
+import elastic.util.queue.QueueTimeoutException;
+import elastic.util.util.TechException;
+
+public class Server extends Service implements Runnable {
+	private final ServiceBootstrapConfig sbc;
+	private final ClassLoader cl;
+
+	private SelectorPool acceptPool = null;
+	private SelectorPool transferPool = null;
+	private BlackList blackList = null;
+
+	private final Map<Acceptor, ServerSocketChannel> acceptorsMap = new IdentityHashMap<Acceptor, ServerSocketChannel>();
+
+	public Server(ServiceBootstrapConfig sbc, ClassLoader cl,
+			Container container) {
+		super(Server.class, sbc, cl, container);
+
+		this.sbc = sbc;
+		this.cl = cl;
+		this.blackList = new BlackList(60000L, 10000, -10);
+	}
+
+	public void run() {
+		try {
+			Thread.currentThread().setContextClassLoader(cl);
+			super.run();
+
+			if (getServiceConfig().getMinAcceptThrs() < 1)
+				throw new IllegalArgumentException("minAcceptThrs < 1");
+
+			if (getServiceConfig().getMinTransferThrs() < 1)
+				throw new IllegalArgumentException("minTransferThrs < 1");
+
+			acceptPool = new SelectorPool(this,
+					new AcceptSelectorEventHandler(), getServiceConfig()
+							.getMinAcceptThrs(), false);
+			new LifeCycle(acceptPool, "acceptPL", this).start();
+
+			transferPool = new SelectorPool(this,
+					new TransferSelectorEventHandler(), getServiceConfig()
+							.getMinTransferThrs(), true);
+			new LifeCycle(transferPool, "tranferPL", this).start();
+
+			ServerSocketConfiguration ssconf = new ServerSocketConfiguration();
+			InetSocketAddress socketAddress = new InetSocketAddress(
+					(InetAddress) null, getServiceConfig().getServerPort());
+			ssconf.setSocketAddress(socketAddress);
+
+			ServerSocket ss = ssconf.createSocket();
+			ServerSocketChannel ssc = ss.getChannel();
+			Acceptor acceptor = new Acceptor(ss.getLocalSocketAddress(),
+					new ServerSessionFactory(), this);
+			new LifeCycle(acceptor, "acceptor", this).start();
+			registerAcceptor(acceptor, ssc);
+
+			while (true) {
+				Event event = getEvent();
+				if (event != null) {
+					if (event instanceof EventInitProcMap) {
+						restartCronjobs();
+					}
+				}
+				try {
+					Thread.sleep(3000);
+				} catch (InterruptedException e) {
+				}
+			}
+		} catch (RuntimeException e) {
+			logError(e);
+			throw e;
+		} catch (Throwable e) {
+			logError(e);
+			throw new RuntimeException(e);
+		}
+	}
+
+	public int getPort() {
+		return getServiceConfig().getServerPort();
+	}
+
+	public static String address(String ip) {
+		if (ip.charAt(0) == '/')
+			return ip.substring(1);
+		return ip;
+	}
+
+	public void killEventHandler() {
+		super.killEventHandler();
+
+		synchronized (acceptorsMap) {
+			Iterator it = acceptorsMap.entrySet().iterator();
+			while (it.hasNext()) {
+				Map.Entry entry = (Map.Entry) it.next();
+				Acceptor acceptor = (Acceptor) entry.getKey();
+				ServerSocketChannel ssc = (ServerSocketChannel) entry
+						.getValue();
+				acceptor.currentLifeCycle().killNow();
+				closeServerSocketChannel(ssc);
+				it.remove();
+			}
+		}
+		if (acceptPool != null)
+			acceptPool.stop();
+		if (transferPool != null)
+			transferPool.stop();
+	}
+
+	public boolean isBusy() {
+		return false;
+	}
+
+	void closeServerSocketChannel(ServerSocketChannel ssc) {
+		if (ssc != null) {
+			try {
+				ServerSocketChannel tmp = ssc;
+				ssc = null;
+				tmp.close();
+
+				logInfo("closed port " + getServiceConfig().getServerPort());
+			} catch (Throwable e) {
+				logError(e);
+			}
+		}
+	}
+
+	/**
+	 * Adds a service to this server. A service is a coupling of a protocol
+	 * handler factory and a server socket configuration. After a service is
+	 * added, the server will accept connections on the socket address specified
+	 * by the server configuration and hand over accepted connections to the
+	 * protocol handler factory. The protocol handlers created by the factory
+	 * will then be called whenever there is a pending read or write operation
+	 * on their associated connection.
+	 * 
+	 * @param factory
+	 *            the protocol handler factory that will create protocol
+	 *            handlers for servicing connections
+	 * @param ssconf
+	 *            a ServerSocketConfiguration object that specifies server
+	 *            socket address, port, timeout behavior, etc.
+	 * @return a service object that represents the registered network service.
+	 * @throws QueueTimeoutException
+	 */
+	public void registerAcceptor(Acceptor acceptor, ServerSocketChannel ssc)
+			throws IOException, TechException, QueueTimeoutException {
+		acceptPool.register(ssc, acceptor);
+		synchronized (acceptorsMap) {
+			acceptorsMap.put(acceptor, ssc);
+		}
+		logInfo("listening to the port " + getServiceConfig().getServerPort());
+	}
+
+	void removeAcceptor(Acceptor acceptor) {
+		synchronized (acceptorsMap) {
+			ServerSocketChannel ssc = (ServerSocketChannel) acceptorsMap
+					.remove(acceptor);
+			if (ssc != null)
+				closeServerSocketChannel(ssc);
+		}
+	}
+
+	boolean registerColdSession(SocketChannel sc, AbstractServerSession session) {
+		boolean success = false;
+		try {
+			success = transferPool.register(sc, session);
+		} catch (Exception e) {
+			logError(e);
+		}
+		return success;
+	}
+
+	public BlackList getBlackList() {
+		return blackList;
+	}
+}

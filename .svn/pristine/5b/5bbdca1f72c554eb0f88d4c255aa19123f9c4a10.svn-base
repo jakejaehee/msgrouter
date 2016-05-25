@@ -1,0 +1,31 @@
+package msgrouter.engine;
+
+import msgrouter.api.QueueEntry;
+import elastic.util.queue.QueueTimeoutException;
+import elastic.util.util.TechException;
+
+public class IpGroup extends KeyedList<String, Session> {
+	private String ip;
+
+	public IpGroup(String ip) {
+		this.ip = ip;
+	}
+
+	public String getIp() {
+		return ip;
+	}
+
+	public void putAllSQ(QueueEntry qe) throws TechException,
+			QueueTimeoutException {
+		for (int l = 0; l < size(); l++) {
+			Session ss = get(l);
+			if (ss != null) {
+				ss.putSQ(qe);
+			}
+		}
+	}
+
+	public String toString() {
+		return "hash=" + hashCode() + ", ip=" + ip + ": " + super.toString();
+	}
+}

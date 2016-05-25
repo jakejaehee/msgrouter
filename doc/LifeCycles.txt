@@ -1,0 +1,26 @@
+### 서버단 클라이언트 관련 객체 Life Cycle
+
+o Connection 생성
+  . Server > AcceptSelectorThr > SelectorEventHandler(=Server) > Acceptor:
+    public boolean handleSelectorEvent(final SelectionKey selKey) {
+		SocketChannel sc = ((ServerSocketChannel) selKey.channel()).accept();
+	}
+
+o Cold Session(로그인 전, ssRegistryPool 등록 전) 생성
+  . TransferSelectorThr > Registration:
+		boolean register(Selector sel)
+
+o Warm Session(로그인 후, ssRegistryPool 등록 후) 시작
+  . TransferSelectorThr > TransferSelectorEventHandler > Service:
+    Service.startSession(Session ss)
+  
+o Session 소멸
+  . Session:
+	public void killEventHandler() {
+		getService().deregisterSession(this);
+	}
+  
+o Connection 소멸
+  . ServerSession: 
+  . TransferSelectorThr:
+	public void cancelSelectionKey(SelectionKey selKey, boolean logEnabled)

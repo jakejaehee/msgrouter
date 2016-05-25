@@ -1,0 +1,954 @@
+package msgrouter.engine.config;
+
+import java.io.File;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+import msgrouter.api.interfaces.MessageFactory;
+import msgrouter.api.interfaces.adapter.MessageRecver;
+import msgrouter.api.interfaces.adapter.MessageSender;
+import msgrouter.constant.Const;
+import msgrouter.engine.DefaultMessageLoggerFormat;
+import msgrouter.engine.MessageLogger;
+import msgrouter.engine.MessageLoggerParams;
+import msgrouter.engine.MiscUtil;
+import msgrouter.engine.MsgRouter;
+import msgrouter.engine.Service;
+import msgrouter.engine.ServiceInitializer;
+import msgrouter.engine.SessionCloser;
+import msgrouter.engine.SessionInitializer;
+import msgrouter.engine.ThreadInitializer;
+import msgrouter.engine.config.ContainersConfig.ServiceBootstrapConfig;
+import msgrouter.engine.config.rule.ProcessMap;
+import msgrouter.engine.queue.Queue;
+import msgrouter.engine.queue.QueueParams;
+
+import org.apache.log4j.Logger;
+import org.dom4j.Node;
+
+import elastic.util.beanmgr.BeanMgr;
+import elastic.util.java.ReflectionUtil;
+import elastic.util.sqlmgr.SqlConnPool;
+import elastic.util.sqlmgr.SqlConnPoolManager;
+import elastic.util.util.CommonUtil;
+import elastic.util.util.DataTypeUtil;
+import elastic.util.util.FilePathUtil;
+import elastic.util.util.StringUtil;
+import elastic.util.util.TechException;
+import elastic.util.xml.XmlReader;
+import elastic.util.xml.XmlUtil;
+
+public class ServiceConfig {
+	public static final String AUTH_MANAGER = "authManager";
+
+	public static final String X_ROUTING_TARGET = "routingTarget";
+	public static final String SVAL_ROUTING_TARGET_MSGROUTER_ID = "msgrouterId";
+	public static final String SVAL_ROUTING_TARGET_CUSTOM_ID = "customId";
+	public static final String SVAL_ROUTING_TARGET_IP = "ipAddress";
+	public static final String SVAL_ROUTING_TARGET_SESSION = "session";
+
+	public static final String X_DUP_ALIVE = "dupAlive";
+	public static final String SVAL_DUP_ALIVE_FIRST = "first";
+	public static final String SVAL_DUP_ALIVE_LAST = "last";
+	public static final String SVAL_DUP_ALIVE_ALL = "all";
+
+	public static final String ATTR_ID = "id";
+	public static final String SVAL_SVC_TYPE_NOSESSION = "nosession";
+	public static final String SVAL_SVC_TYPE_SERVER = "server";
+	public static final String SVAL_SVC_TYPE_CLIENT = "client";
+
+	public static final String DESCRIPTION = "description";
+	public static final String SERVER_PORT = "port";
+	public static final String SERVER_USERIDS = "users";
+	public static final String SERVER_GROUPIDS = "groups";
+	public static final String CLIENT_DST_IP = "dstIp";
+	public static final String CLIENT_DST_PORT = "dstPort";
+	public static final String CLIENT_DST_URL = "dstUrl";
+	public static final String CLIENT_MY_USERID = "myUser";
+	public static final String CLIENT_REQ_ENCODING = "reqEncoding";
+	public static final String CONN = "connection";
+	public static final String CONN_PROP_ENCODING = "encoding";
+	public static final String CONN_PROP_RECV_TIMEOUT_MILLIS = "recvTimeoutMillis";
+	public static final String QUEUE = "queue";
+
+	public static final String ATTR_BEAN_ID = "bean";
+	public static final String MIN_ACCEPT_THRS = "minAcceptThrs";
+	public static final String MIN_TRANS_THRS = "minTransferThrs";
+	public static final String MAX_SESSIONS_PER_TRANS_THR = "maxSessionsPerTransferThr";
+	public static final String MIN_BEAN_THRS = "minBeanThrs";
+	public static final String MAX_SESSIONS_PER_BEAN_THR = "maxSessionsPerBeanThr";
+
+	private final ServiceBootstrapConfig sbc;
+	private String sqlConnPoolName = null;
+	private short routingTarget = Service.IVAL_ROUTING_TARGET_SESSION;
+	private short dupAliveType = Service.IVAL_DUP_ALIVE_FIRST;
+	private String amConfFullPath = null;
+	private String logDbPoolName = null;
+	private String loginerClassName = null;
+	private Integer serverPort = null;
+	private String[] userIds = null;
+	private String[] groupIds = null;
+	private String dstIp = null;
+	private Integer dstPort;
+	private String dstUrlStr = null;
+	private String reqEncoding = null;
+	private Class msgFactoryClass = null;
+	private Class recverClass = null;
+	private Class senderClass = null;
+	private Map connectionProps = null;
+	private QueueParams qParams = null;
+	private MessageLoggerParams svcMsgLogParams = null;
+	private Integer minAcceptThrs = null;
+	private Integer minTransferThrs = null;
+	private Integer maxSessionsPerTransferThr = null;
+	private Integer minBeanThrs = null;
+	private Integer maxSessionsPerBeanThr = null;
+	private Class thrInitClass = null;
+	private Class svcInitClass = null;
+	private Class sessionInitClass = null;
+	private Class sessionCloserClass = null;
+	private ProcessMap procMap = null;
+	private ClassLoader cl = null;
+
+	public ServiceConfig(ServiceBootstrapConfig sbc, ClassLoader cl)
+			throws TechException {
+		this.sbc = sbc;
+		this.cl = cl;
+
+		if (sbc.getServiceType() < 0) {
+			throw new TechException("Unknown service type: "
+					+ sbc.getServiceTypeName());
+		}
+
+		this.qParams = new QueueParams();
+
+		try {
+			Logger log = Logger.getLogger(ServiceConfig.class);
+			if (log.isInfoEnabled()) {
+				log.info("parses node '" + sbc.getServiceTypeName() + "', "
+						+ ATTR_ID + "=" + sbc.getServiceId());
+			}
+
+			XmlReader xml = new XmlReader(new File(sbc.getServicePath()
+					+ File.separator + "service.xml"));
+			Node elasticNode = xml.getNode("/service/elastic");
+
+			String beanConfiguration = XmlUtil.getText(elasticNode,
+					"beanConfiguration");
+			if (beanConfiguration != null) {
+				BeanMgr.getInstance().loadBeans(sbc.getServiceId(),
+						xml.getDir(), beanConfiguration, cl);
+			}
+
+			Node svcNode = xml.getNode("/service");
+			if (MsgRouter.getInstance().getSqlConnPoolManager() != null) {
+				Node sqlMapsNode = XmlUtil.getElement(svcNode, "sqlMaps");
+				if (sqlMapsNode != null) {
+					sqlConnPoolName = XmlUtil.getAttributeStringValue(
+							sqlMapsNode, "sqlConnPool");
+					String sqlMapsPath = XmlUtil.getAttributeStringValue(
+							sqlMapsNode, "xml");
+					sqlMapsPath = FilePathUtil.getAbsolutePath(xml.getDir(),
+							sqlMapsPath);
+					SqlConnPool sqlConnPool = MsgRouter.getInstance()
+							.getSqlConnPoolManager()
+							.getSqlConnPool(sqlConnPoolName);
+					if (sqlConnPool == null) {
+						throw new TechException(
+								SqlConnPool.class.getSimpleName()
+										+ " '"
+										+ sqlConnPoolName
+										+ "' is not defined at the "
+										+ SqlConnPoolManager.class
+												.getSimpleName());
+					}
+					sqlConnPool.getSqlMaps()
+							.addAndInitSqlMapConfig(sqlMapsPath);
+				}
+			}
+
+			List childs = XmlUtil.getChildElements(svcNode);
+			String dupAliveStr = null;
+
+			for (int i = 0; childs != null && i < childs.size(); i++) {
+				Node svcChild = (Node) childs.get(i);
+				if (ThreadInitializer.class.getSimpleName().equalsIgnoreCase(
+						svcChild.getName())) {
+					String className = XmlUtil.getAttributeStringValue(
+							svcChild, "class");
+					thrInitClass = Class.forName(className, true, cl);
+					if (!ReflectionUtil.isCastable(thrInitClass,
+							ThreadInitializer.class)) {
+						throw new TechException(className + " is not a "
+								+ ThreadInitializer.class.getName());
+					}
+				} else if (ServiceInitializer.class.getSimpleName()
+						.equalsIgnoreCase(svcChild.getName())) {
+					String className = XmlUtil.getAttributeStringValue(
+							svcChild, "class");
+					svcInitClass = Class.forName(className, true, cl);
+					if (!ReflectionUtil.isCastable(svcInitClass,
+							ServiceInitializer.class)) {
+						throw new TechException(className + " is not a "
+								+ ServiceInitializer.class.getName());
+					}
+				} else if (SessionInitializer.class.getSimpleName()
+						.equalsIgnoreCase(svcChild.getName())) {
+					String className = XmlUtil.getAttributeStringValue(
+							svcChild, "class");
+					sessionInitClass = Class.forName(className, true, cl);
+					if (!ReflectionUtil.isCastable(sessionInitClass,
+							SessionInitializer.class)) {
+						throw new TechException(className + " is not a "
+								+ SessionInitializer.class.getName());
+					}
+				} else if (SessionCloser.class.getSimpleName()
+						.equalsIgnoreCase(svcChild.getName())) {
+					String className = XmlUtil.getAttributeStringValue(
+							svcChild, "class");
+					sessionCloserClass = Class.forName(className, true, cl);
+					if (!ReflectionUtil.isCastable(sessionCloserClass,
+							SessionCloser.class)) {
+						throw new TechException(className + " is not a "
+								+ SessionCloser.class.getName());
+					}
+				} else if (AUTH_MANAGER.equalsIgnoreCase(svcChild.getName())) {
+					String amConfPath = XmlUtil.getAttributeStringValue(
+							svcChild, "xml");
+					logDbPoolName = XmlUtil.getAttributeStringValue(svcChild,
+							"logDbPoolName");
+					amConfFullPath = FilePathUtil.getAbsolutePath(xml.getDir(),
+							amConfPath);
+					String userIdsStr = XmlUtil.getText(svcChild,
+							SERVER_USERIDS);
+					userIds = StringUtil.splitWithoutEmpty(userIdsStr, ",");
+					if (log.isInfoEnabled()) {
+						log.info(sbc.getServiceTypeName() + " "
+								+ sbc.getServiceId() + ": users=" + userIdsStr);
+					}
+					String groupIdsStr = XmlUtil.getText(svcChild,
+							SERVER_GROUPIDS);
+					groupIds = StringUtil.splitWithoutEmpty(groupIdsStr, ",");
+					if (log.isInfoEnabled()) {
+						log.info(sbc.getServiceTypeName() + " "
+								+ sbc.getServiceId() + ": groups="
+								+ groupIdsStr);
+					}
+				} else if (X_ROUTING_TARGET
+						.equalsIgnoreCase(svcChild.getName())) {
+					String rtType = XmlUtil.getAttributeStringValue(svcChild,
+							"type");
+					if (SVAL_ROUTING_TARGET_MSGROUTER_ID.equals(rtType)) {
+						routingTarget = Service.IVAL_ROUTING_TARGET_MSGROUTER_ID;
+					} else if (SVAL_ROUTING_TARGET_CUSTOM_ID.equals(rtType)) {
+						routingTarget = Service.IVAL_ROUTING_TARGET_CUSTOM_ID;
+					} else if (SVAL_ROUTING_TARGET_IP.equals(rtType)) {
+						routingTarget = Service.IVAL_ROUTING_TARGET_IP;
+					} else if (SVAL_ROUTING_TARGET_SESSION.equals(rtType)) {
+						routingTarget = Service.IVAL_ROUTING_TARGET_SESSION;
+					}
+					switch (routingTarget) {
+					case Service.IVAL_ROUTING_TARGET_MSGROUTER_ID:
+						dupAliveStr = XmlUtil.getAttributeStringValue(svcChild,
+								SVAL_ROUTING_TARGET_MSGROUTER_ID, X_DUP_ALIVE);
+						if (SVAL_DUP_ALIVE_FIRST.equalsIgnoreCase(dupAliveStr)) {
+							dupAliveType = Service.IVAL_DUP_ALIVE_FIRST;
+						} else if (SVAL_DUP_ALIVE_LAST
+								.equalsIgnoreCase(dupAliveStr)) {
+							dupAliveType = Service.IVAL_DUP_ALIVE_LAST;
+						} else if (SVAL_DUP_ALIVE_ALL
+								.equalsIgnoreCase(dupAliveStr)) {
+							dupAliveType = Service.IVAL_DUP_ALIVE_ALL;
+						}
+						break;
+					case Service.IVAL_ROUTING_TARGET_CUSTOM_ID:
+						loginerClassName = XmlUtil.getAttributeStringValue(
+								svcChild, SVAL_ROUTING_TARGET_CUSTOM_ID,
+								"loginerClass");
+						dupAliveStr = XmlUtil.getAttributeStringValue(svcChild,
+								SVAL_ROUTING_TARGET_CUSTOM_ID, X_DUP_ALIVE);
+						if (SVAL_DUP_ALIVE_FIRST.equalsIgnoreCase(dupAliveStr)) {
+							dupAliveType = Service.IVAL_DUP_ALIVE_FIRST;
+						} else if (SVAL_DUP_ALIVE_LAST
+								.equalsIgnoreCase(dupAliveStr)) {
+							dupAliveType = Service.IVAL_DUP_ALIVE_LAST;
+						} else if (SVAL_DUP_ALIVE_ALL
+								.equalsIgnoreCase(dupAliveStr)) {
+							dupAliveType = Service.IVAL_DUP_ALIVE_ALL;
+						}
+						break;
+					case Service.IVAL_ROUTING_TARGET_IP:
+						dupAliveStr = XmlUtil.getAttributeStringValue(svcChild,
+								SVAL_ROUTING_TARGET_IP, X_DUP_ALIVE);
+						if (SVAL_DUP_ALIVE_FIRST.equalsIgnoreCase(dupAliveStr)) {
+							dupAliveType = Service.IVAL_DUP_ALIVE_FIRST;
+						} else if (SVAL_DUP_ALIVE_LAST
+								.equalsIgnoreCase(dupAliveStr)) {
+							dupAliveType = Service.IVAL_DUP_ALIVE_LAST;
+						} else if (SVAL_DUP_ALIVE_ALL
+								.equalsIgnoreCase(dupAliveStr)) {
+							dupAliveType = Service.IVAL_DUP_ALIVE_ALL;
+						}
+						break;
+					case Service.IVAL_ROUTING_TARGET_SESSION:
+						break;
+					}
+
+				} else if ("server".equalsIgnoreCase(svcChild.getName())) {
+
+					serverPort = XmlUtil.getInt(svcChild, SERVER_PORT);
+					if (log.isInfoEnabled())
+						log.info(sbc.getServiceTypeName() + " "
+								+ sbc.getServiceId() + ": port=" + serverPort);
+
+					minAcceptThrs = XmlUtil.getInt(svcChild, MIN_ACCEPT_THRS);
+					if (log.isInfoEnabled())
+						log.info(sbc.getServiceTypeName() + " "
+								+ sbc.getServiceId() + ": minAcceptThrs="
+								+ minAcceptThrs);
+
+					minTransferThrs = XmlUtil.getInt(svcChild, MIN_TRANS_THRS);
+					if (log.isInfoEnabled())
+						log.info(sbc.getServiceTypeName() + " "
+								+ sbc.getServiceId() + ": minTransferThrs="
+								+ minTransferThrs);
+
+					maxSessionsPerTransferThr = XmlUtil.getInt(svcChild,
+							MAX_SESSIONS_PER_TRANS_THR);
+					if (log.isInfoEnabled())
+						log.info(sbc.getServiceTypeName() + " "
+								+ sbc.getServiceId()
+								+ ": maxSessionsPerTransferThr="
+								+ maxSessionsPerTransferThr);
+
+					minBeanThrs = XmlUtil.getInt(svcChild, MIN_BEAN_THRS);
+					if (log.isInfoEnabled())
+						log.info(sbc.getServiceTypeName() + " "
+								+ sbc.getServiceId() + ": minBeanThrs="
+								+ minBeanThrs);
+
+					maxSessionsPerBeanThr = XmlUtil.getInt(svcChild,
+							MAX_SESSIONS_PER_BEAN_THR);
+					if (log.isInfoEnabled())
+						log.info(sbc.getServiceTypeName() + " "
+								+ sbc.getServiceId()
+								+ ": maxSessionsPerBeanThr="
+								+ maxSessionsPerBeanThr);
+
+				} else if ("client".equalsIgnoreCase(svcChild.getName())) {
+
+					dstPort = XmlUtil.getInt(svcChild, CLIENT_DST_PORT);
+					if (log.isInfoEnabled())
+						log.info(sbc.getServiceTypeName() + " "
+								+ sbc.getServiceId() + ": dstPort=" + dstPort);
+
+					dstIp = XmlUtil.getText(svcChild, CLIENT_DST_IP);
+					if (log.isInfoEnabled())
+						log.info(sbc.getServiceTypeName() + " "
+								+ sbc.getServiceId() + ": dstIp=" + dstIp);
+
+					dstUrlStr = XmlUtil.getText(svcChild, CLIENT_DST_URL);
+					if (!StringUtil.isEmpty(dstUrlStr))
+						if (log.isInfoEnabled())
+							log.info(sbc.getServiceTypeName() + " "
+									+ sbc.getServiceId() + ": dstUrl="
+									+ dstUrlStr);
+
+					reqEncoding = XmlUtil
+							.getText(svcChild, CLIENT_REQ_ENCODING);
+					if (!StringUtil.isEmpty(reqEncoding))
+						if (log.isInfoEnabled())
+							log.info(sbc.getServiceTypeName() + " "
+									+ sbc.getServiceId() + ": reqEncoding="
+									+ reqEncoding);
+
+				} else if (CONN.equalsIgnoreCase(svcChild.getName())) {
+					List childList = XmlUtil.getChildElements(svcChild);
+					for (int j = 0; childList != null && j < childList.size(); j++) {
+						Node child = (Node) childList.get(j);
+						if ("props".equalsIgnoreCase(child.getName())) {
+							connectionProps = parseConnPropsNode(child);
+							if (log.isDebugEnabled()) {
+								log.debug(getServiceId()
+										+ "'s connectionProps="
+										+ connectionProps);
+							}
+						} else if (MessageFactory.class.getSimpleName()
+								.equalsIgnoreCase(child.getName())) {
+							String className = XmlUtil.getAttributeStringValue(
+									child, "class");
+							if (className != null
+									&& !"".equalsIgnoreCase(className)) {
+								msgFactoryClass = Class.forName(className,
+										true, cl);
+								if (log.isInfoEnabled()) {
+									log.info(sbc.getServiceTypeName()
+											+ " "
+											+ sbc.getServiceId()
+											+ ": "
+											+ MessageFactory.class
+													.getSimpleName() + "="
+											+ msgFactoryClass.getName());
+								}
+							}
+						} else if (MessageRecver.class.getSimpleName()
+								.equalsIgnoreCase(child.getName())) {
+							String className = XmlUtil.getAttributeStringValue(
+									child, "class");
+							if (className != null
+									&& !"".equalsIgnoreCase(className)) {
+								recverClass = Class
+										.forName(className, true, cl);
+								if (log.isInfoEnabled()) {
+									log.info(sbc.getServiceTypeName()
+											+ " "
+											+ sbc.getServiceId()
+											+ ": "
+											+ MessageRecver.class
+													.getSimpleName() + "="
+											+ recverClass.getName());
+								}
+							}
+						} else if (MessageSender.class.getSimpleName()
+								.equalsIgnoreCase(child.getName())) {
+							String className = XmlUtil.getAttributeStringValue(
+									child, "class");
+							if (className != null && !"".equals(className)) {
+								senderClass = Class
+										.forName(className, true, cl);
+								if (log.isInfoEnabled()) {
+									log.info(sbc.getServiceTypeName()
+											+ " "
+											+ sbc.getServiceId()
+											+ ": "
+											+ MessageSender.class
+													.getSimpleName() + "="
+											+ senderClass.getName());
+								}
+							}
+						}
+					}
+				} else if (Queue.class.getSimpleName().equalsIgnoreCase(
+						svcChild.getName())) {
+					this.qParams = parseQueueNode(svcChild);
+
+				} else if (ProcessMap.class.getSimpleName().equalsIgnoreCase(
+						svcChild.getName())) {
+					String pmConfPath = XmlUtil.getAttributeStringValue(
+							svcChild, "xml");
+					/*
+					 * ProcessMap configuration
+					 */
+					String pmConfFullPath = FilePathUtil.getAbsolutePath(
+							xml.getDir(), pmConfPath);
+					if (log.isInfoEnabled()) {
+						log.info("loading " + pmConfFullPath);
+					}
+					this.procMap = new ProcessMap(this, pmConfFullPath, false,
+							cl);
+				} else if (MessageLogger.class.getSimpleName()
+						.equalsIgnoreCase(svcChild.getName())) {
+					svcMsgLogParams = parseMessageLoggerNode(svcChild);
+				}
+			}
+
+			QueueParams globalQP = MsgRouter.getInstance().getConfig()
+					.getMainConfig().getGlobalQueueParams();
+			qParams.setUndefinedAttributes(globalQP);
+
+			if (log.isInfoEnabled()) {
+				log.info("Service " + getServiceId() + "'s "
+						+ QueueParams.class.getSimpleName() + "=" + qParams);
+			}
+		} catch (TechException e) {
+			throw e;
+		} catch (Exception e) {
+			throw new TechException(e);
+		}
+	}
+
+	private MessageLoggerParams parseMessageLoggerNode(Node msgLogNode)
+			throws ClassNotFoundException {
+		MessageLoggerParams params = new MessageLoggerParams();
+		String logPerStr = XmlUtil
+				.getAttributeStringValue(msgLogNode, "logPer");
+		if ("off".equalsIgnoreCase(logPerStr)) {
+			params.setLogPer(Const.IVAL_MSG_LOG_PER_OFF);
+		} else if ("service".equalsIgnoreCase(logPerStr)) {
+			params.setLogPer(Const.IVAL_MSG_LOG_PER_SERVICE);
+		} else if ("loginId".equalsIgnoreCase(logPerStr)) {
+			params.setLogPer(Const.IVAL_MSG_LOG_PER_LOGIN_ID);
+		}
+
+		params.setPath(XmlUtil.getText(msgLogNode, "root") + File.separator
+				+ "service-" + sbc.getServiceId(), "message.log");
+		params.setDatePattern(XmlUtil.getText(msgLogNode, "datePattern"));
+		params.setEncoding(XmlUtil.getText(msgLogNode, "encoding"));
+		params.setLayoutName(XmlUtil.getText(msgLogNode, "layout"));
+		params.setLayoutParams(XmlUtil.getText(msgLogNode, "layoutParams"));
+		params.setMaxFileSize(XmlUtil.getInt(msgLogNode, "maxFileSize"));
+		String formatClassName = XmlUtil.getText(msgLogNode, "format");
+		if (formatClassName != null && !"".equals(formatClassName.trim())) {
+			params.setFormatClass(Class.forName(formatClassName, true, cl));
+		} else {
+			params.setFormatClass(DefaultMessageLoggerFormat.class);
+		}
+		return params;
+	}
+
+	public String getSqlConnPoolName() {
+		return sqlConnPoolName;
+	}
+
+	private Map parseConnPropsNode(Node propsNode) {
+		Map map = new HashMap();
+		List entryList = XmlUtil.getChildElements(propsNode);
+		for (int n = 0; entryList != null && n < entryList.size(); n++) {
+			Node entryNode = (Node) entryList.get(n);
+			if (entryNode.getNodeType() != Node.ELEMENT_NODE) {
+				continue;
+			}
+			String typeStr = entryNode.getName();
+			Object value = null;
+			String valueStr = XmlUtil.getText(entryNode);
+			if (valueStr != null) {
+				value = DataTypeUtil.toObjectByType(valueStr, typeStr);
+			}
+			String key = getKeyAttribute(entryNode);
+			map.put(key, value);
+		}
+		return map;
+	}
+
+	private String getKeyAttribute(Node element) {
+		return getAttributeStringValue(element, new String[] { "name", "key" });
+	}
+
+	private static String getAttributeStringValue(Node element,
+			String[] attrNames) {
+		for (int i = 0; i < attrNames.length; i++) {
+			String val = XmlUtil.getAttributeStringValue(element, attrNames[i]);
+			if (val != null) {
+				return val;
+			}
+		}
+		return null;
+	}
+
+	public ServiceBootstrapConfig getServiceBootstrapConfig() {
+		return sbc;
+	}
+
+	public Class getThreadInitializerClass() {
+		return thrInitClass;
+	}
+
+	public Class getServiceInitializerClass() {
+		return svcInitClass;
+	}
+
+	public Class getSessionInitializerClass() {
+		return sessionInitClass;
+	}
+
+	public Class getSessionCloserClass() {
+		return sessionCloserClass;
+	}
+
+	public String getAuthManagerConfigPath() {
+		return amConfFullPath;
+	}
+
+	public short getRoutingTarget() {
+		return routingTarget;
+	}
+
+	public short getDupAliveType() {
+		return dupAliveType;
+	}
+
+	public String getLogDbPoolName() {
+		return logDbPoolName;
+	}
+
+	public String getLoginerClassName() {
+		return loginerClassName;
+	}
+
+	public static QueueParams parseQueueNode(Node queueNode) {
+		QueueParams qp = new QueueParams();
+		String typeStr = XmlUtil.getAttributeStringValue(queueNode, "type");
+		if ("memory".equalsIgnoreCase(typeStr)) {
+			qp.setQueueType(Queue.QTYPE_MEMORY);
+		} else if ("file".equalsIgnoreCase(typeStr)) {
+			qp.setQueueType(Queue.QTYPE_FILE);
+		} else {
+			qp.setQueueType(Queue.QTYPE_MEMORY);
+		}
+		List queueChilds = XmlUtil.getChildElements(queueNode);
+		for (int i = 0; queueChilds != null && i < queueChilds.size(); i++) {
+			Node argNode = (Node) queueChilds.get(i);
+			if ("memoryLoadEntries".equalsIgnoreCase(argNode.getName())) {
+				qp.setMemoryLoadEntries(XmlUtil.getInt(argNode));
+			} else if ("timeoutMillisecond".equalsIgnoreCase(argNode.getName())) {
+				qp.setTimeoutMillisecond(XmlUtil.getLong(argNode));
+			} else if ("fileBlockEntries".equalsIgnoreCase(argNode.getName())) {
+				qp.setFileBlockEntries(XmlUtil.getInt(argNode));
+			} else if ("fileErrorFlexible".equalsIgnoreCase(argNode.getName())) {
+				qp.setFileErrorFlexible(XmlUtil.getBoolean(argNode));
+			} else if ("inactiveTimeoutMinute".equalsIgnoreCase(argNode
+					.getName())) {
+				qp.setInactiveTimeoutMinute(XmlUtil.getInt(argNode));
+			} else if ("dir".equalsIgnoreCase(argNode.getName())) {
+				qp.setBaseDir(XmlUtil.getText(argNode));
+			}
+		}
+		return qp;
+	}
+
+	public String getDescription() {
+		return sbc.getDescription();
+	}
+
+	public void setServerPort(int serverPort) {
+		this.serverPort = serverPort;
+	}
+
+	public int getServerPort() {
+		return MiscUtil.toPrimitiveType(serverPort, -1);
+	}
+
+	public void setUserIds(String[] userIds) {
+		this.userIds = userIds;
+	}
+
+	public String[] getUserIds() {
+		return userIds;
+	}
+
+	public void setGroupIds(String[] groupIds) {
+		this.groupIds = groupIds;
+	}
+
+	public String[] getGroupIds() {
+		return groupIds;
+	}
+
+	public void setDstIp(String dstIp) {
+		this.dstIp = dstIp;
+	}
+
+	public String getDstIp() {
+		return dstIp;
+	}
+
+	public void setDstPort(Integer dstPort) {
+		this.dstPort = dstPort;
+	}
+
+	public int getDstPort() {
+		return MiscUtil.toPrimitiveType(dstPort, -1);
+	}
+
+	public void setDstUrlStr(String dstUrlStr) {
+		this.dstUrlStr = dstUrlStr;
+	}
+
+	public String getDstUrlStr() {
+		return dstUrlStr;
+	}
+
+	public void setReqEncoding(String encoding) {
+		this.reqEncoding = encoding;
+	}
+
+	public String getReqEncoding() {
+		return reqEncoding;
+	}
+
+	public void setMessageFactoryClassName(String className)
+			throws TechException {
+		try {
+			msgFactoryClass = Class.forName(className, true, cl);
+		} catch (ClassNotFoundException e) {
+			throw new TechException(e);
+		}
+	}
+
+	public void setRecverClassName(String className) throws TechException {
+		try {
+			recverClass = Class.forName(className, true, cl);
+		} catch (ClassNotFoundException e) {
+			throw new TechException(e);
+		}
+	}
+
+	public void setSenderClassName(String className) throws TechException {
+		try {
+			senderClass = Class.forName(className, true, cl);
+		} catch (ClassNotFoundException e) {
+			throw new TechException(e);
+		}
+	}
+
+	public Class getMessageFactoryClass() {
+		return msgFactoryClass;
+	}
+
+	public Class getRecverClass() {
+		return recverClass;
+	}
+
+	public Class getSenderClass() {
+		return senderClass;
+	}
+
+	public Map getConnectionProps() {
+		if (connectionProps == null) {
+			connectionProps = new HashMap();
+		}
+		return connectionProps;
+	}
+
+	public void setMinAcceptThrs(Integer minAcceptThrs) {
+		this.minAcceptThrs = minAcceptThrs;
+	}
+
+	public int getMinAcceptThrs() {
+		return MiscUtil.toPrimitiveType(minAcceptThrs, 1);
+	}
+
+	public void setMinTransferThrs(Integer minTransferThrs) {
+		this.minTransferThrs = minTransferThrs;
+	}
+
+	public int getMinTransferThrs() {
+		return MiscUtil.toPrimitiveType(minTransferThrs, 1);
+	}
+
+	public void setMaxSessionsPerTransferThr(Integer maxSessionsPerTransferThr) {
+		this.maxSessionsPerTransferThr = maxSessionsPerTransferThr;
+	}
+
+	public int getMaxSessionsPerTransferThr() {
+		return Config.IS_WINDOWS ? 63 : MiscUtil.toPrimitiveType(
+				maxSessionsPerTransferThr, 1024);
+	}
+
+	public void setMinBeanThrs(int minBeanThrs) {
+		this.minBeanThrs = minBeanThrs;
+	}
+
+	public int getMinBeanThrs() {
+		return MiscUtil.toPrimitiveType(minBeanThrs, 1);
+	}
+
+	public void setMaxSessionsPerBeanThr(int maxSessionsPerBeanThr) {
+		this.maxSessionsPerBeanThr = maxSessionsPerBeanThr;
+	}
+
+	public int getMaxSessionsPerBeanThr() {
+		return MiscUtil.toPrimitiveType(maxSessionsPerBeanThr, 1024);
+	}
+
+	public void setQueueParams(QueueParams qp) {
+		this.qParams = qp;
+	}
+
+	public QueueParams getQueueParams() {
+		return qParams;
+	}
+
+	public String getServiceId() {
+		return sbc.getServiceId();
+	}
+
+	public boolean isServerService() {
+		return sbc.getServiceType() == Service.IVAL_SVC_TYPE_SERVER;
+	}
+
+	public boolean isClientService() {
+		return sbc.getServiceType() == Service.IVAL_SVC_TYPE_CLIENT;
+	}
+
+	public boolean isNoSessionService() {
+		return sbc.getServiceType() == Service.IVAL_SVC_TYPE_NOSESSION;
+	}
+
+	public static final String xmlTag(String nodeName, Object value) {
+		return "<" + nodeName + ">" + value + "</" + nodeName + ">"
+				+ CommonUtil.NEW_LINE;
+	}
+
+	public String toText() {
+		StringBuilder sb = new StringBuilder();
+
+		sb.append(
+				"		<" + sbc.getServiceTypeName() + " id=\""
+						+ sbc.getServiceId() + "\">").append(
+				CommonUtil.NEW_LINE);
+		sb.append("			<description>" + sbc.getDescription() + "</description>")
+				.append(CommonUtil.NEW_LINE);
+
+		if (serverPort != null && serverPort > 0) {
+			sb.append("			" + xmlTag(SERVER_PORT, serverPort));
+		}
+
+		if (dstIp != null) {
+			sb.append("			" + xmlTag(CLIENT_DST_IP, dstIp));
+		}
+
+		if (dstPort != null && dstPort > 0) {
+			sb.append("			" + xmlTag(CLIENT_DST_PORT, dstPort));
+		}
+
+		if (userIds != null && userIds.length > 0) {
+			sb.append("			"
+					+ xmlTag(SERVER_USERIDS,
+							StringUtil.toCSVWithoutSpace(userIds)));
+		}
+
+		if (groupIds != null && groupIds.length > 0) {
+			sb.append("			"
+					+ xmlTag(SERVER_GROUPIDS,
+							StringUtil.toCSVWithoutSpace(groupIds)));
+		}
+
+		if (recverClass != null) {
+			sb.append("			<connection>").append(CommonUtil.NEW_LINE);
+			if (getConnectionProps() != null) {
+				sb.append("				<props>").append(CommonUtil.NEW_LINE);
+				if (getConnectionProps().get("encoding") != null) {
+					sb.append(
+							"					<prop key=\"encoding\">"
+									+ getConnectionProps().get("encoding")
+									+ "</prop>").append(CommonUtil.NEW_LINE);
+				}
+
+				if (getConnectionProps().get("recvTimeoutMillis") != null) {
+					sb.append(
+							"					<prop key=\"recvTimeoutMillis\">"
+									+ getConnectionProps().get(
+											"recvTimeoutMillis") + "</prop>")
+							.append(CommonUtil.NEW_LINE);
+				}
+				sb.append("				</props>").append(CommonUtil.NEW_LINE);
+			}
+			sb.append(
+					"				<receiver class=\"" + recverClass.getName() + "\" />")
+					.append(CommonUtil.NEW_LINE);
+			sb.append("				<sender class=\"" + senderClass.getName() + "\" />")
+					.append(CommonUtil.NEW_LINE);
+			sb.append("			</connection>").append(CommonUtil.NEW_LINE);
+		}
+
+		if (minAcceptThrs != null) {
+			sb.append("			" + xmlTag(MIN_ACCEPT_THRS, minAcceptThrs));
+		}
+		if (minTransferThrs != null) {
+			sb.append("			" + xmlTag(MIN_TRANS_THRS, minTransferThrs));
+		}
+		if (maxSessionsPerTransferThr != null) {
+			sb.append("			"
+					+ xmlTag(MAX_SESSIONS_PER_TRANS_THR,
+							maxSessionsPerTransferThr));
+		}
+		if (minBeanThrs != null) {
+			sb.append("			" + xmlTag(MIN_BEAN_THRS, minBeanThrs));
+		}
+		if (maxSessionsPerBeanThr != null) {
+			sb.append("			"
+					+ xmlTag(MAX_SESSIONS_PER_BEAN_THR, maxSessionsPerBeanThr));
+		}
+
+		if (qParams != null) {
+			sb.append(toConfigText(qParams)).append(CommonUtil.NEW_LINE);
+		}
+
+		sb.append("		</" + sbc.getServiceTypeName() + ">");
+
+		return sb.toString();
+	}
+
+	public ProcessMap getProcessMap() {
+		return procMap;
+	}
+
+	public String toString() {
+		return toText();
+	}
+
+	public static String toConfigText(QueueParams qp) {
+		StringBuilder sb = new StringBuilder();
+		if (qp.getQueueType() == Queue.QTYPE_FILE) {
+			sb.append("			<queue type=\"file\">").append(CommonUtil.NEW_LINE);
+		} else if (qp.getQueueType() == Queue.QTYPE_MEMORY) {
+			sb.append("			<queue type=\"memory\">").append(CommonUtil.NEW_LINE);
+		}
+
+		if (qp.getQueueType() == Queue.QTYPE_FILE) {
+			if (qp.getBaseDir() != null) {
+				sb.append("				<dir>" + qp.getBaseDir() + "</dir>").append(
+						CommonUtil.NEW_LINE);
+			}
+			if (qp.getFileBlockEntries() != null) {
+				sb.append(
+						"				<fileBlockEntries>" + qp.getFileBlockEntries()
+								+ "</fileBlockEntries>").append(
+						CommonUtil.NEW_LINE);
+			}
+			if (qp.isFileErrorFlexible() != null) {
+				sb.append(
+						"				<fileErrorFlexible>" + qp.isFileErrorFlexible()
+								+ "</fileErrorFlexible>").append(
+						CommonUtil.NEW_LINE);
+			}
+			if (qp.getInactiveTimeoutMinute() != null) {
+				sb.append(
+						"				<inactiveTimeoutMinute>"
+								+ qp.getInactiveTimeoutMinute()
+								+ "</inactiveTimeoutMinute>").append(
+						CommonUtil.NEW_LINE);
+			}
+			if (qp.isPersistent() != null) {
+				sb.append(
+						"				<persistent>" + qp.isPersistent()
+								+ "</persistent>").append(CommonUtil.NEW_LINE);
+			}
+		} else if (qp.getQueueType() == Queue.QTYPE_MEMORY) {
+		}
+
+		if (qp.getMemoryLoadEntries() != null) {
+			sb.append(
+					"				<memoryLoadEntries>" + qp.getMemoryLoadEntries()
+							+ "</memoryLoadEntries>").append(
+					CommonUtil.NEW_LINE);
+		}
+
+		if (qp.getTimeoutMillisecond() != null) {
+			sb.append(
+					"				<timeoutMillisecond>" + qp.getTimeoutMillisecond()
+							+ "</timeoutMillisecond>").append(
+					CommonUtil.NEW_LINE);
+		}
+		sb.append("			</queue>");
+		return sb.toString();
+	}
+
+	public MessageLoggerParams getServiceMessageLoggerParams() {
+		return svcMsgLogParams;
+	}
+
+	public static QueueParams getDefaultQueueParams() {
+		QueueParams qp = new QueueParams();
+		qp.qType = Queue.QTYPE_MEMORY;
+		qp.fileBlockEntries = Const.VAL_Q_FILE_BLOCK_ENTRIES;
+		qp.inactiveTimeoutMinute = Const.VAL_Q_INACTIVE_TIMEOUT_MINUTE;
+		qp.fileErrorFlexible = Const.VAL_Q_FILE_ERROR_FLEXIBLE;
+		qp.memoryLoadEntries = Const.VAL_Q_MEMORY_LOAD_ENTRIES;
+		qp.timeoutMillisecond = Const.VAL_Q_TIMEOUT;
+		qp.persistent = false;
+		return qp;
+	}
+}

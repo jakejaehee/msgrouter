@@ -1,0 +1,346 @@
+package msgrouter.engine.socket.server;
+
+import java.io.IOException;
+import java.nio.channels.ClosedChannelException;
+import java.nio.channels.SelectableChannel;
+import java.nio.channels.SelectionKey;
+import java.nio.channels.Selector;
+import java.nio.channels.SocketChannel;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.Map;
+import java.util.Set;
+
+import msgrouter.constant.Const;
+import msgrouter.engine.Service;
+import msgrouter.engine.socket.NioUtil;
+import msgrouter.engine.socket.server.impl.TransferSelectorEventHandler;
+import elastic.util.lifecycle.LifeCycle;
+import elastic.util.lifecycle.LifeCycleObject;
+import elastic.util.queue.NotSynchronizedQueue;
+import elastic.util.queue.QueueTimeoutException;
+import elastic.util.util.TechException;
+
+public final class SelectorThr extends LifeCycleObject implements Runnable {
+	private final Service svc;
+	private final Selector sel;
+	private final SelectorEventHandler eventHandler;
+	private final boolean transferSelPool;
+	private boolean shouldNotify = false;
+	private final NotSynchronizedQueue<Registration> pendingRegistrations = new NotSynchronizedQueue<Registration>();
+	private Map blackList = new HashMap();
+
+	SelectorThr(Service svc, SelectorEventHandler eventHandler,
+			boolean transferSelPool) throws IOException {
+		super(SelectorThr.class);
+
+		this.svc = svc;
+		this.sel = Selector.open();
+		this.eventHandler = eventHandler;
+		this.transferSelPool = transferSelPool;
+	}
+
+	public void run() {
+		Set<SelectionKey> pendingSelKeys = null;
+
+		while (!currentLifeCycle().isShutdownMode()
+				|| !currentLifeCycle().readyToShutdown()) {
+			try {
+				if (currentLifeCycle().sleep(Const.VAL_LOOP_SLEEP_MILLIS,
+						Const.VAL_LOOP_SLEEP_NANOS)) {
+					continue;
+				}
+
+				interestWriteOpForPendingWriteEvents();
+
+				int updatedKeys = sel.select();
+				Set<SelectionKey> selectedSelKeys = sel.selectedKeys();
+
+				/*
+				 * selected된 SelectionKey가 있거나 이전에 송수신처리가 완료되지 않은 pending 건이 있을
+				 * 경우 해당 SelectionKey들을 처리한다.
+				 */
+				if (selectedSelKeys.size() > 0 || pendingSelKeys != null) {
+					pendingSelKeys = serviceSelKeys(selectedSelKeys,
+							pendingSelKeys);
+
+					if (pendingSelKeys != null)
+						sel.wakeup();
+				}
+
+				registerPendingChannels();
+			} catch (Throwable e) {
+				logError(e);
+			}
+		}
+	}
+
+	private void interestWriteOpForPendingWriteEvents() {
+		if (transferSelPool) {
+			Iterator it = sel.keys().iterator();
+			while (it.hasNext()) {
+				SelectionKey selKey = (SelectionKey) it.next();
+				Object att = selKey.attachment();
+				if (att != null) {
+					AbstractServerSession ss = (AbstractServerSession) att;
+					if (ss.sizeOfSQ() > 0) {
+						if (ss.getSelectionKey().isValid()) {
+							ss.getSelectionKey().interestOps(
+									SelectionKey.OP_WRITE);
+						}
+					}
+				}
+			}
+		}
+	}
+
+	/**
+	 * selected된 SelectionKey들과 이전에 송수신처리가 완료되지 않고 pending되었던 SelectionKey들에 대한
+	 * 송수신처리를 한다. 만일 하나의 SelectionKey에 대한 송수신처리에서 정해진 건수를 초과할 경우에는 다시 pending 큐에
+	 * 해당 SelectionKey를 넣어후 리턴하여 다음 번에 처리할 수 있도록 한다.
+	 * 
+	 * @param selectedSelKeys
+	 * @param pendingSelKeys
+	 * @return 송수신처리건수가 일정한 건수를 초과할 경우 해당 SelectionKey를 pending 큐에 넣어서 리턴한다.
+	 */
+	private Set<SelectionKey> serviceSelKeys(
+			final Set<SelectionKey> selectedSelKeys,
+			final Set<SelectionKey> pendingSelKeys) {
+
+		Set<SelectionKey> newPendingSQ = null;
+
+		/*
+		 * 이전에 송수신처리를 완료하지 않고 pending하였던 SelectionKey들을 selKeys의 뒷부분에 추가하여 함께
+		 * 처리하도록 한다. selected된 SelectionKey들을 먼저 처리한 후 pending 건들을 처리해야 한다. 그래야
+		 * 특정한 SelectionKey만 처리하지 않고 다른 SelectionKey들도 처리할 수 있다. 즉 특정 세션에 의한 독점을
+		 * 막을 수 있다.
+		 */
+		selectedSelKeys.addAll(pendingSelKeys);
+
+		Iterator it = selectedSelKeys.iterator();
+
+		while (it.hasNext()) {
+			SelectionKey selKey = (SelectionKey) it.next();
+			// it.remove();
+			if (!selKey.isValid())
+				continue;
+
+			try {
+				boolean done = eventHandler.processSelectionKey(svc, this,
+						selKey);
+
+				/*
+				 * 송수신처리 건이 남은 경우 pending queue에 SelectionKey를 넣어서 다음 select()
+				 * 호출 시 blocking되지 않고 다시 serviceSelectedKeys()가 호출되어 처리할 수 있도록
+				 * 한다.
+				 */
+				if (!done) {
+					if (newPendingSQ == null)
+						newPendingSQ = (Set) new ArrayList<SelectionKey>();
+
+					newPendingSQ.add(selKey);
+				}
+			} catch (QueueTimeoutException e) {
+				logWarn(e.getMessage());
+			} catch (TechException e) {
+				logError(e);
+			} catch (IOException e) {
+				SocketChannel sc = (SocketChannel) selKey.channel();
+				String ip = sc.socket().getInetAddress().getHostAddress();
+				BlackList bl = ((Server) svc).getBlackList();
+				Score score = bl.getScore(ip);
+				if (score.white) {
+					if (System.currentTimeMillis() - score.lastTime < bl
+							.getWhiteInterval()) {
+						score.value--;
+					}
+					if (score.value <= bl.getBlackScore()) {
+						score.white = false;
+					}
+				}
+				score.lastTime = System.currentTimeMillis();
+				try {
+					if (score.white) {
+						if (logTraceEnabled())
+							logTrace("closes channel=" + selKey.channel());
+					}
+					selKey.channel().close();
+				} catch (Throwable t) {
+				}
+				LifeCycle lc = ((LifeCycleObject) selKey.attachment())
+						.currentLifeCycle();
+				if (lc != null) {
+					lc.killNow();
+				}
+				if (score.white) {
+					if (logTraceEnabled())
+						logTrace("cancels SelectionKey=" + selKey);
+				}
+				selKey.cancel();
+				if (score.white) {
+					if (logTraceEnabled()) {
+						logError(e);
+					} else {
+						logError(e.getMessage());
+					}
+				}
+			} catch (Throwable t) {
+				logError(t);
+			} finally {
+				if (eventHandler instanceof TransferSelectorEventHandler
+						&& selKey.isValid()) {
+					selKey.interestOps(SelectionKey.OP_READ
+							| SelectionKey.OP_WRITE);
+				}
+			}
+		}
+		return newPendingSQ;
+	}
+
+	boolean register(SelectableChannel sc, LifeCycleObject attachment)
+			throws ClosedChannelException, TechException, QueueTimeoutException {
+		synchronized (pendingRegistrations) {
+			if (currentLifeCycle().isShutdownMode())
+				return false;
+
+			if (sel.keys().size() + pendingRegistrations.size() == svc
+					.getServiceConfig().getMaxSessionsPerTransferThr())
+				return false;
+
+			Registration reg = new Registration(this, sc, attachment);
+			pendingRegistrations.put(reg);
+			sel.wakeup();
+			try {
+				shouldNotify = true;
+				pendingRegistrations.wait();
+			} catch (InterruptedException e) {
+				// Intentionally ignored
+			}
+			return true;
+		}
+	}
+
+	public void deregister(AbstractServerSession session) {
+		SelectionKey readSelKey = session.getSelectionKey();
+		if (readSelKey != null)
+			readSelKey.cancel();
+
+		if (session.logTraceEnabled())
+			session.logTrace("deregistered");
+	}
+
+	private void registerPendingChannels() {
+		synchronized (pendingRegistrations) {
+			int maxRegistrable = svc.getServiceConfig()
+					.getMaxSessionsPerTransferThr() - sel.keys().size();
+			while (maxRegistrable > 0 && !pendingRegistrations.isEmpty()) {
+				Registration reg = (Registration) pendingRegistrations.poll();
+				boolean success = false;
+				try {
+					success = reg.register(sel);
+				} catch (Throwable t) {
+					logError(t);
+				}
+				if (!success) {
+					--maxRegistrable;
+				}
+			}
+			if (shouldNotify) {
+				pendingRegistrations.notifyAll();
+				shouldNotify = false;
+			}
+			pendingRegistrations.clear();
+		}
+	}
+
+	public boolean isBusy() {
+		return false;
+	}
+
+	public void killEventHandler() {
+		synchronized (pendingRegistrations) {
+			closeAllChannels();
+			sel.wakeup();
+		}
+	}
+
+	private void closeAllChannels() {
+		NioUtil.closeAllChannels(sel);
+	}
+
+	int getThreadLoad() {
+		synchronized (pendingRegistrations) {
+			sel.wakeup();
+			try {
+				shouldNotify = true;
+				pendingRegistrations.wait();
+			} catch (InterruptedException e) {
+			}
+			return sel.keys().size() + pendingRegistrations.size();
+		}
+	}
+
+	private static final class Registration {
+		private SelectorThr st;
+		private SelectableChannel channel;
+		private LifeCycleObject attachment;
+		private SelectionKey selKey;
+
+		Registration(SelectorThr st, SelectableChannel channel,
+				LifeCycleObject attachment) {
+			this.st = st;
+			this.channel = channel;
+			this.attachment = attachment;
+		}
+
+		boolean register(Selector sel) throws IOException {
+			try {
+				if (attachment instanceof Acceptor) {
+					selKey = channel.register(sel, SelectionKey.OP_ACCEPT,
+							attachment);
+					if (st.logTraceEnabled())
+						st.logTrace("registered an acceptor: "
+								+ NioUtil.infoOf(selKey));
+				} else if (attachment instanceof AbstractServerSession) {
+					selKey = channel.register(sel, SelectionKey.OP_READ
+							| SelectionKey.OP_WRITE, attachment);
+					((AbstractServerSession) attachment)
+							.setSelectionKey(selKey);
+					if (st.logTraceEnabled())
+						st.logTrace("registered a session: "
+								+ NioUtil.infoOf(selKey));
+				}
+				return true;
+			} catch (IOException e) {
+				throw e;
+			} catch (Throwable e) {
+				return false;
+			}
+		}
+	}
+
+	public static void closeAllChannels(Selector selector) {
+		try {
+			Iterator it = selector.keys().iterator();
+			while (it.hasNext()) {
+				SelectableChannel channel = ((SelectionKey) it.next())
+						.channel();
+				if (channel != null) {
+					try {
+						synchronized (channel) {
+							if (channel.isOpen())
+								channel.close();
+						}
+					} catch (IOException e) {
+					}
+				}
+			}
+		} finally {
+			try {
+				selector.close();
+			} catch (Exception e) {
+			}
+		}
+	}
+}

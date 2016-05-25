@@ -1,0 +1,93 @@
+package msgrouter.api.interfaces.bean;
+
+import msgrouter.api.QueueEntry;
+import msgrouter.api.interfaces.Message;
+import msgrouter.engine.Router;
+import msgrouter.engine.queue.QueueTimeoutException;
+import elastic.util.util.TechException;
+
+public abstract class AsyncBean extends Bean {
+
+	private static final long serialVersionUID = 3958221455530093679L;
+
+	private boolean repeatableOnMessage = false;
+	private int repeatIntervalOnMessage = 0;
+	private long lastTimeOnMessage = 0;
+
+	private boolean repeatableOnCronjob = false;
+	private int repeatIntervalOnCronjob = 0;
+	private long lastTimeOnCronjob = 0;
+
+	public void stopRepeatableOnMessage() {
+		this.repeatableOnMessage = false;
+	}
+
+	public void startRepeatableOnMessage(int repeatIntervalMillis) {
+		this.repeatableOnMessage = true;
+		this.repeatIntervalOnMessage = repeatIntervalMillis;
+	}
+
+	public boolean isRepeatableOnMessage() {
+		return repeatableOnMessage;
+	}
+
+	public int getRepeatIntervalOnMessage() {
+		return repeatIntervalOnMessage;
+	}
+
+	public long getLastTimeOnMessage() {
+		return lastTimeOnMessage;
+	}
+
+	public void stopRepeatableOnCronjob() {
+		this.repeatableOnCronjob = false;
+	}
+
+	public void startRepeatableOnCronjob(int repeatIntervalMillis) {
+		this.repeatableOnCronjob = true;
+		this.repeatIntervalOnCronjob = repeatIntervalMillis;
+	}
+
+	public boolean isRepeatableOnCronjob() {
+		return repeatableOnCronjob;
+	}
+
+	public int getRepeatIntervalOnCronjob() {
+		return repeatIntervalOnCronjob;
+	}
+
+	public long getLastTimeOnCronjob() {
+		return lastTimeOnCronjob;
+	}
+
+	public QueueEntry _onMessage(Message msg) throws TechException {
+		try {
+			QueueEntry qe = onMessage(msg);
+			lastTimeOnMessage = System.currentTimeMillis();
+			return qe;
+		} catch (TechException e) {
+			stopRepeatableOnMessage();
+			throw e;
+		}
+	}
+
+	public QueueEntry _onCronjob() throws TechException {
+		try {
+			QueueEntry qe = onCronjob();
+			lastTimeOnCronjob = System.currentTimeMillis();
+			return qe;
+		} catch (TechException e) {
+			stopRepeatableOnCronjob();
+			throw e;
+		}
+	}
+
+	protected abstract QueueEntry onMessage(Message msg) throws TechException;
+
+	protected abstract QueueEntry onCronjob() throws TechException;
+
+	protected final void switchTo(String dstSvcId, QueueEntry qe)
+			throws TechException, QueueTimeoutException {
+		Router.switchTo(qe, dstSvcId);
+	}
+}

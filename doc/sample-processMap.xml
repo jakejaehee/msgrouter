@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<processMap>
+	<sessionCronjobs>
+		<cronjob class="full class name">
+			<timeTable>
+				<period>
+					<second>30</second>
+				</period>
+			</timeTable>
+			<return messageType="message type">
+				<sentTrigger class="full class name">
+				</sentTrigger>
+				<switchTo service="service name" marshalClass="full class name">
+				</switchTo>
+			</return>
+		</cronjob>
+	</sessionCronjobs>
+
+	<nosessionCronjobs>
+		<cronjob class="full class name">
+			<timeTable>
+				<period>
+					<second>30</second>
+				</period>
+			</timeTable>
+			<return messageType="message type">
+				<sentTrigger class="full class name">
+				</sentTrigger>
+				<switchTo service="service name" marshalClass="full class name">
+				</switchTo>
+			</return>
+		</cronjob>
+	</nosessionCronjobs>
+
+	<message messageType="message type">
+		<switchTo service="service name" marshalClass="full class name">
+		</switchTo>
+		<bean class="full class name">
+			<return messageType="message type">
+				<sentTrigger class="full class name">
+				</sentTrigger>
+				<switchTo service="service name" marshalClass="full class name">
+				</switchTo>
+			</return>
+			<return messageType="message type">
+				<sentTrigger class="full class name">
+				</sentTrigger>
+				<switchTo service="service name" marshalClass="full class name">
+				</switchTo>
+			</return>
+		</bean>
+	</message>
+
+</processMap>

@@ -1,0 +1,404 @@
+11:33:40,919 DEBUG [exautil.lifecycle.LifeCycleObject:52][Thread-28] /ExaBus.2/SocketContainer.2/mstSender/acceptor: accepted a client (Acceptor, ACTIVE, 0 children, 71day 19:59:49.854(6,206,389,854ms))
+11:33:40,920 TRACE [exabus.adapter.json.JSONNioServerConn:30][Thread-28] socketChannel=java.nio.channels.SocketChannel[connected local=/11.71.35.210:7900 remote=/12.57.200.86:59670]
+11:33:40,920 TRACE [exabus.adapter.json.JSONNioServerConn:31][Thread-28] props=null
+11:33:40,940 TRACE [exautil.lifecycle.LifeCycleObject:63][Thread-30] /ExaBus.2/SocketContainer.2/mstSender/tranferPool/SelectorThread.1: registered a session: SelectionKey=1360488819:  (SelectorThread, ACTIVE, 0 children, 71day 19:59:50.011(6,206,390,011ms))
+11:33:43,863 TRACE [exautil.lifecycle.LifeCycleObject:63][Thread-30] /ExaBus.2/SocketContainer.2/mstSender/tranferPool/SelectorThread.1: closes channel=java.nio.channels.SocketChannel[connected local=/11.71.35.210:7900 remote=/12.57.200.86:59670] (SelectorThread, ACTIVE, 0 children, 71day 19:59:52.934(6,206,392,934ms))
+11:33:43,863 TRACE [exautil.lifecycle.LifeCycleObject:63][Thread-30] /ExaBus.2/SocketContainer.2/mstSender/tranferPool/SelectorThread.1: cancels SelectionKey=sun.nio.ch.SelectionKeyImpl@51176973 (SelectorThread, ACTIVE, 0 children, 71day 19:59:52.934(6,206,392,934ms))
+11:33:43,864 ERROR [exautil.lifecycle.LifeCycleObject:79][Thread-30] /ExaBus.2/SocketContainer.2/mstSender/tranferPool/SelectorThread.1: java.io.IOException: End Of Stream
+	at exabus.engine.socket.io.nioutil.ChannelUtil.readJsonList():43
+	at exabus.adapter.json.JSONNioInputStream.read():27
+	at exabus.api.socket.io.MsgRecver.recv():42
+	at exabus.engine.socket.nioserver.EBNioServerSession.tryToLogin():148
+	at exabus.engine.socket.nioserver.TransferSelectorEventHandler.processSelectionKey():34
+	at exabus.engine.socket.nioserver.SelectorThread.serviceSelectedKeys():242
+	at exabus.engine.socket.nioserver.SelectorThread.run():143
+	at exautil.lifecycle.LifeCycle$Runner.run():123
+	at java.lang.Thread.run():662
+ (SelectorThread, ACTIVE, 0 children, 71day 19:59:52.935(6,206,392,935ms))
+11:34:42,726 DEBUG [exautil.lifecycle.LifeCycleObject:52][Thread-28] /ExaBus.2/SocketContainer.2/mstSender/acceptor: accepted a client (Acceptor, ACTIVE, 0 children, 71day 20:00:51.661(6,206,451,661ms))
+11:34:42,726 TRACE [exabus.adapter.json.JSONNioServerConn:30][Thread-28] socketChannel=java.nio.channels.SocketChannel[connected local=/11.71.35.210:7900 remote=/70.121.244.18:64471]
+11:34:42,726 TRACE [exabus.adapter.json.JSONNioServerConn:31][Thread-28] props=null
+11:34:42,734 TRACE [exautil.lifecycle.LifeCycleObject:63][Thread-32] /ExaBus.2/SocketContainer.2/mstSender/tranferPool/SelectorThread.2: registered a session: SelectionKey=151460061:  (SelectorThread, ACTIVE, 0 children, 71day 20:00:51.801(6,206,451,801ms))
+11:34:44,770 TRACE [exautil.lifecycle.LifeCycleObject:63][Thread-32] /ExaBus.2/SocketContainer.2/mstSender/tranferPool/SelectorThread.2: closes channel=java.nio.channels.SocketChannel[connected local=/11.71.35.210:7900 remote=/70.121.244.18:64471] (SelectorThread, ACTIVE, 0 children, 71day 20:00:53.837(6,206,453,837ms))
+11:34:44,770 TRACE [exautil.lifecycle.LifeCycleObject:63][Thread-32] /ExaBus.2/SocketContainer.2/mstSender/tranferPool/SelectorThread.2: cancels SelectionKey=sun.nio.ch.SelectionKeyImpl@90718dd (SelectorThread, ACTIVE, 0 children, 71day 20:00:53.837(6,206,453,837ms))
+11:34:44,771 ERROR [exautil.lifecycle.LifeCycleObject:79][Thread-32] /ExaBus.2/SocketContainer.2/mstSender/tranferPool/SelectorThread.2: java.io.IOException: End Of Stream
+	at exabus.engine.socket.io.nioutil.ChannelUtil.readJsonList():43
+	at exabus.adapter.json.JSONNioInputStream.read():27
+	at exabus.api.socket.io.MsgRecver.recv():42
+	at exabus.engine.socket.nioserver.EBNioServerSession.tryToLogin():148
+	at exabus.engine.socket.nioserver.TransferSelectorEventHandler.processSelectionKey():34
+	at exabus.engine.socket.nioserver.SelectorThread.serviceSelectedKeys():242
+	at exabus.engine.socket.nioserver.SelectorThread.run():143
+	at exautil.lifecycle.LifeCycle$Runner.run():123
+	at java.lang.Thread.run():662
+ (SelectorThread, ACTIVE, 0 children, 71day 20:00:53.838(6,206,453,838ms))
+11:35:53,421 DEBUG [exautil.lifecycle.LifeCycleObject:52][Thread-28] /ExaBus.2/SocketContainer.2/mstSender/acceptor: accepted a client (Acceptor, ACTIVE, 0 children, 71day 20:02:02.356(6,206,522,356ms))
+11:35:53,421 TRACE [exabus.adapter.json.JSONNioServerConn:30][Thread-28] socketChannel=java.nio.channels.SocketChannel[connected local=/11.71.35.210:7900 remote=/11.71.35.210:59946]
+11:35:53,422 TRACE [exabus.adapter.json.JSONNioServerConn:31][Thread-28] props=null
+11:35:53,422 TRACE [exautil.lifecycle.LifeCycleObject:63][Thread-30] /ExaBus.2/SocketContainer.2/mstSender/tranferPool/SelectorThread.1: registered a session: SelectionKey=65066706:  (SelectorThread, ACTIVE, 0 children, 71day 20:02:02.493(6,206,522,493ms))
+11:35:58,810 TRACE [exautil.lifecycle.LifeCycleObject:63][Thread-30] /ExaBus.2/SocketContainer.2/mstSender/tranferPool/SelectorThread.1: closes channel=java.nio.channels.SocketChannel[connected local=/11.71.35.210:7900 remote=/11.71.35.210:59946] (SelectorThread, ACTIVE, 0 children, 71day 20:02:07.881(6,206,527,881ms))
+11:35:58,811 TRACE [exautil.lifecycle.LifeCycleObject:63][Thread-30] /ExaBus.2/SocketContainer.2/mstSender/tranferPool/SelectorThread.1: cancels SelectionKey=sun.nio.ch.SelectionKeyImpl@3e0d6d2 (SelectorThread, ACTIVE, 0 children, 71day 20:02:07.882(6,206,527,882ms))
+11:35:58,811 ERROR [exautil.lifecycle.LifeCycleObject:79][Thread-30] /ExaBus.2/SocketContainer.2/mstSender/tranferPool/SelectorThread.1: java.io.IOException: End Of Stream
+	at exabus.engine.socket.io.nioutil.ChannelUtil.readJsonList():43
+	at exabus.adapter.json.JSONNioInputStream.read():27
+	at exabus.api.socket.io.MsgRecver.recv():42
+	at exabus.engine.socket.nioserver.EBNioServerSession.tryToLogin():148
+	at exabus.engine.socket.nioserver.TransferSelectorEventHandler.processSelectionKey():34
+	at exabus.engine.socket.nioserver.SelectorThread.serviceSelectedKeys():242
+	at exabus.engine.socket.nioserver.SelectorThread.run():143
+	at exautil.lifecycle.LifeCycle$Runner.run():123
+	at java.lang.Thread.run():662
+ (SelectorThread, ACTIVE, 0 children, 71day 20:02:07.882(6,206,527,882ms))
+11:36:09,309 DEBUG [exautil.lifecycle.LifeCycleObject:52][Thread-28] /ExaBus.2/SocketContainer.2/mstSender/acceptor: accepted a client (Acceptor, ACTIVE, 0 children, 71day 20:02:18.243(6,206,538,243ms))
+11:36:09,309 TRACE [exabus.adapter.json.JSONNioServerConn:30][Thread-28] socketChannel=java.nio.channels.SocketChannel[connected local=/11.71.35.208:7900 remote=/11.71.35.208:59972]
+11:36:09,309 TRACE [exabus.adapter.json.JSONNioServerConn:31][Thread-28] props=null
+11:36:09,314 TRACE [exautil.lifecycle.LifeCycleObject:63][Thread-32] /ExaBus.2/SocketContainer.2/mstSender/tranferPool/SelectorThread.2: registered a session: SelectionKey=1650389512:  (SelectorThread, ACTIVE, 0 children, 71day 20:02:18.381(6,206,538,381ms))
+11:36:12,488 TRACE [exautil.lifecycle.LifeCycleObject:63][Thread-32] /ExaBus.2/SocketContainer.2/mstSender/tranferPool/SelectorThread.2: closes channel=java.nio.channels.SocketChannel[connected local=/11.71.35.208:7900 remote=/11.71.35.208:59972] (SelectorThread, ACTIVE, 0 children, 71day 20:02:21.555(6,206,541,555ms))
+11:36:12,489 TRACE [exautil.lifecycle.LifeCycleObject:63][Thread-32] /ExaBus.2/SocketContainer.2/mstSender/tranferPool/SelectorThread.2: cancels SelectionKey=sun.nio.ch.SelectionKeyImpl@625ef208 (SelectorThread, ACTIVE, 0 children, 71day 20:02:21.556(6,206,541,556ms))
+11:36:12,489 ERROR [exautil.lifecycle.LifeCycleObject:79][Thread-32] /ExaBus.2/SocketContainer.2/mstSender/tranferPool/SelectorThread.2: java.io.IOException: End Of Stream
+	at exabus.engine.socket.io.nioutil.ChannelUtil.readJsonList():43
+	at exabus.adapter.json.JSONNioInputStream.read():27
+	at exabus.api.socket.io.MsgRecver.recv():42
+	at exabus.engine.socket.nioserver.EBNioServerSession.tryToLogin():148
+	at exabus.engine.socket.nioserver.TransferSelectorEventHandler.processSelectionKey():34
+	at exabus.engine.socket.nioserver.SelectorThread.serviceSelectedKeys():242
+	at exabus.engine.socket.nioserver.SelectorThread.run():143
+	at exautil.lifecycle.LifeCycle$Runner.run():123
+	at java.lang.Thread.run():662
+ (SelectorThread, ACTIVE, 0 children, 71day 20:02:21.556(6,206,541,556ms))
+11:36:40,117 DEBUG [exautil.lifecycle.LifeCycleObject:52][Thread-28] /ExaBus.2/SocketContainer.2/mstSender/acceptor: accepted a client (Acceptor, ACTIVE, 0 children, 71day 20:02:49.052(6,206,569,052ms))
+11:36:40,117 TRACE [exabus.adapter.json.JSONNioServerConn:30][Thread-28] socketChannel=java.nio.channels.SocketChannel[connected local=/11.71.35.208:7900 remote=/11.71.35.208:60021]
+11:36:40,118 TRACE [exabus.adapter.json.JSONNioServerConn:31][Thread-28] props=null
+11:36:40,118 TRACE [exautil.lifecycle.LifeCycleObject:63][Thread-30] /ExaBus.2/SocketContainer.2/mstSender/tranferPool/SelectorThread.1: registered a session: SelectionKey=1101604718:  (SelectorThread, ACTIVE, 0 children, 71day 20:02:49.189(6,206,569,189ms))
+11:36:43,772 TRACE [exautil.lifecycle.LifeCycleObject:63][Thread-30] /ExaBus.2/SocketContainer.2/mstSender/tranferPool/SelectorThread.1: closes channel=java.nio.channels.SocketChannel[connected local=/11.71.35.208:7900 remote=/11.71.35.208:60021] (SelectorThread, ACTIVE, 0 children, 71day 20:02:52.843(6,206,572,843ms))
+11:36:43,773 TRACE [exautil.lifecycle.LifeCycleObject:63][Thread-30] /ExaBus.2/SocketContainer.2/mstSender/tranferPool/SelectorThread.1: cancels SelectionKey=sun.nio.ch.SelectionKeyImpl@41a9276e (SelectorThread, ACTIVE, 0 children, 71day 20:02:52.844(6,206,572,844ms))
+11:36:43,773 ERROR [exautil.lifecycle.LifeCycleObject:79][Thread-30] /ExaBus.2/SocketContainer.2/mstSender/tranferPool/SelectorThread.1: java.io.IOException: End Of Stream
+	at exabus.engine.socket.io.nioutil.ChannelUtil.readJsonList():43
+	at exabus.adapter.json.JSONNioInputStream.read():27
+	at exabus.api.socket.io.MsgRecver.recv():42
+	at exabus.engine.socket.nioserver.EBNioServerSession.tryToLogin():148
+	at exabus.engine.socket.nioserver.TransferSelectorEventHandler.processSelectionKey():34
+	at exabus.engine.socket.nioserver.SelectorThread.serviceSelectedKeys():242
+	at exabus.engine.socket.nioserver.SelectorThread.run():143
+	at exautil.lifecycle.LifeCycle$Runner.run():123
+	at java.lang.Thread.run():662
+ (SelectorThread, ACTIVE, 0 children, 71day 20:02:52.844(6,206,572,844ms))
+
+ 
+ 
+ 09:52:44,516 DEBUG [exautil.lifecycle.LifeCycleObject:52][Thread-28] /ExaBus.2/SocketContainer.2/mstSender/acceptor: accepted a client (Acceptor, ACTIVE, 0 children, 73day 18:18:53.451(6,373,133,451ms))
+09:52:44,517 TRACE [exabus.adapter.json.JSONNioServerConn:30][Thread-28] socketChannel=java.nio.channels.SocketChannel[connected local=/11.71.35.210:7900 remote=/11.71.35.210:58255]
+09:52:44,517 TRACE [exabus.adapter.json.JSONNioServerConn:31][Thread-28] props=null
+09:52:44,518 TRACE [exautil.lifecycle.LifeCycleObject:63][Thread-32] /ExaBus.2/SocketContainer.2/mstSender/tranferPool/SelectorThread.2: registered a session: SelectionKey=270282165:  (SelectorThread, ACTIVE, 0 children, 73day 18:18:53.585(6,373,133,585ms))
+09:52:53,480 TRACE [exautil.lifecycle.LifeCycleObject:63][Thread-32] /ExaBus.2/SocketContainer.2/mstSender/tranferPool/SelectorThread.2: closes channel=java.nio.channels.SocketChannel[connected local=/11.71.35.210:7900 remote=/11.71.35.210:58255] (SelectorThread, ACTIVE, 0 children, 73day 18:19:02.547(6,373,142,547ms))
+09:52:53,481 TRACE [exautil.lifecycle.LifeCycleObject:63][Thread-32] /ExaBus.2/SocketContainer.2/mstSender/tranferPool/SelectorThread.2: cancels SelectionKey=sun.nio.ch.SelectionKeyImpl@101c2db5 (SelectorThread, ACTIVE, 0 children, 73day 18:19:02.548(6,373,142,548ms))
+09:52:53,481 ERROR [exautil.lifecycle.LifeCycleObject:79][Thread-32] /ExaBus.2/SocketContainer.2/mstSender/tranferPool/SelectorThread.2: java.io.IOException: End Of Stream
+	at exabus.engine.socket.io.nioutil.ChannelUtil.readJsonList():43
+	at exabus.adapter.json.JSONNioInputStream.read():27
+	at exabus.api.socket.io.MsgRecver.recv():42
+	at exabus.engine.socket.nioserver.EBNioServerSession.tryToLogin():148
+	at exabus.engine.socket.nioserver.TransferSelectorEventHandler.processSelectionKey():34
+	at exabus.engine.socket.nioserver.SelectorThread.serviceSelectedKeys():242
+	at exabus.engine.socket.nioserver.SelectorThread.run():143
+	at exautil.lifecycle.LifeCycle$Runner.run():123
+	at java.lang.Thread.run():662
+ (SelectorThread, ACTIVE, 0 children, 73day 18:19:02.548(6,373,142,548ms))
+ 
+ 
+ 
+14:28:16,172 TRACE [exabus.adapter.json.JSONNioServerConn:30][Thread-28] socketChannel=java.nio.channels.SocketChannel[connected local=/11.71.35.210:7900 remote=/11.71.35.210:52945]
+14:28:16,172 TRACE [exabus.adapter.json.JSONNioServerConn:31][Thread-28] props=null
+14:28:16,173 TRACE [exautil.lifecycle.LifeCycleObject:63][Thread-30] /ExaBus.2/SocketContainer.2/mstSender/tranferPool/SelectorThread.1: registered a session: SelectionKey=450019260:  (SelectorThread, ACTIVE, 0 children, 73day 22:54:25.244(6,389,665,244ms))
+14:28:21,060 TRACE [exautil.lifecycle.LifeCycleObject:63][Thread-30] /ExaBus.2/SocketContainer.2/mstSender/tranferPool/SelectorThread.1: closes channel=java.nio.channels.SocketChannel[connected local=/11.71.35.210:7900 remote=/11.71.35.210:52945] (SelectorThread, ACTIVE, 0 children, 73day 22:54:30.131(6,389,670,131ms))
+14:28:21,061 TRACE [exautil.lifecycle.LifeCycleObject:63][Thread-30] /ExaBus.2/SocketContainer.2/mstSender/tranferPool/SelectorThread.1: cancels SelectionKey=sun.nio.ch.SelectionKeyImpl@1ad2bfbc (SelectorThread, ACTIVE, 0 children, 73day 22:54:30.132(6,389,670,132ms))
+14:28:21,061 ERROR [exautil.lifecycle.LifeCycleObject:79][Thread-30] /ExaBus.2/SocketContainer.2/mstSender/tranferPool/SelectorThread.1: java.io.IOException: End Of Stream
+	at exabus.engine.socket.io.nioutil.ChannelUtil.readJsonList():43
+	at exabus.adapter.json.JSONNioInputStream.read():27
+	at exabus.api.socket.io.MsgRecver.recv():42
+	at exabus.engine.socket.nioserver.EBNioServerSession.tryToLogin():148
+	at exabus.engine.socket.nioserver.TransferSelectorEventHandler.processSelectionKey():34
+	at exabus.engine.socket.nioserver.SelectorThread.serviceSelectedKeys():242
+	at exabus.engine.socket.nioserver.SelectorThread.run():143
+	at exautil.lifecycle.LifeCycle$Runner.run():123
+	at java.lang.Thread.run():662
+ (SelectorThread, ACTIVE, 0 children, 73day 22:54:30.132(6,389,670,132ms))
+14:28:59,980 DEBUG [exautil.lifecycle.LifeCycleObject:52][Thread-28] /ExaBus.2/SocketContainer.2/mstSender/acceptor: accepted a client (Acceptor, ACTIVE, 0 children, 73day 22:55:08.915(6,389,708,915ms))
+14:28:59,981 TRACE [exabus.adapter.json.JSONNioServerConn:30][Thread-28] socketChannel=java.nio.channels.SocketChannel[connected local=/11.71.35.208:7900 remote=/11.71.35.208:53012]
+14:28:59,981 TRACE [exabus.adapter.json.JSONNioServerConn:31][Thread-28] props=null
+14:28:59,981 TRACE [exautil.lifecycle.LifeCycleObject:63][Thread-32] /ExaBus.2/SocketContainer.2/mstSender/tranferPool/SelectorThread.2: registered a session: SelectionKey=1450136732:  (SelectorThread, ACTIVE, 0 children, 73day 22:55:09.048(6,389,709,048ms))
+14:29:03,530 TRACE [exautil.lifecycle.LifeCycleObject:63][Thread-32] /ExaBus.2/SocketContainer.2/mstSender/tranferPool/SelectorThread.2: closes channel=java.nio.channels.SocketChannel[connected local=/11.71.35.208:7900 remote=/11.71.35.208:53012] (SelectorThread, ACTIVE, 0 children, 73day 22:55:12.597(6,389,712,597ms))
+14:29:03,531 TRACE [exautil.lifecycle.LifeCycleObject:63][Thread-32] /ExaBus.2/SocketContainer.2/mstSender/tranferPool/SelectorThread.2: cancels SelectionKey=sun.nio.ch.SelectionKeyImpl@566f549c (SelectorThread, ACTIVE, 0 children, 73day 22:55:12.598(6,389,712,598ms))
+14:29:03,531 ERROR [exautil.lifecycle.LifeCycleObject:79][Thread-32] /ExaBus.2/SocketContainer.2/mstSender/tranferPool/SelectorThread.2: java.io.IOException: End Of Stream
+	at exabus.engine.socket.io.nioutil.ChannelUtil.readJsonList():43
+	at exabus.adapter.json.JSONNioInputStream.read():27
+	at exabus.api.socket.io.MsgRecver.recv():42
+	at exabus.engine.socket.nioserver.EBNioServerSession.tryToLogin():148
+	at exabus.engine.socket.nioserver.TransferSelectorEventHandler.processSelectionKey():34
+	at exabus.engine.socket.nioserver.SelectorThread.serviceSelectedKeys():242
+	at exabus.engine.socket.nioserver.SelectorThread.run():143
+	at exautil.lifecycle.LifeCycle$Runner.run():123
+	at java.lang.Thread.run():662
+ (SelectorThread, ACTIVE, 0 children, 73day 22:55:12.598(6,389,712,598ms))
+ 
+ 
+ 
+ 
+14:31:10,928 DEBUG [exautil.lifecycle.LifeCycleObject:52][Thread-28] /ExaBus.2/SocketContainer.2/mstSender/acceptor: accepted a client (Acceptor, ACTIVE, 0 children, 73day 22:57:19.863(6,389,839,863ms))
+14:31:10,929 TRACE [exabus.adapter.json.JSONNioServerConn:30][Thread-28] socketChannel=java.nio.channels.SocketChannel[connected local=/11.71.35.208:7900 remote=/11.71.35.208:53214]
+14:31:10,929 TRACE [exabus.adapter.json.JSONNioServerConn:31][Thread-28] props=null
+14:31:10,931 TRACE [exautil.lifecycle.LifeCycleObject:63][Thread-30] /ExaBus.2/SocketContainer.2/mstSender/tranferPool/SelectorThread.1: registered a session: SelectionKey=539771759:  (SelectorThread, ACTIVE, 0 children, 73day 22:57:20.001(6,389,840,001ms))
+14:31:16,065 TRACE [exautil.lifecycle.LifeCycleObject:63][Thread-30] /ExaBus.2/SocketContainer.2/mstSender/tranferPool/SelectorThread.1: closes channel=java.nio.channels.SocketChannel[connected local=/11.71.35.208:7900 remote=/11.71.35.208:53214] (SelectorThread, ACTIVE, 0 children, 73day 22:57:25.136(6,389,845,136ms))
+14:31:16,065 TRACE [exautil.lifecycle.LifeCycleObject:63][Thread-30] /ExaBus.2/SocketContainer.2/mstSender/tranferPool/SelectorThread.1: cancels SelectionKey=sun.nio.ch.SelectionKeyImpl@202c436f (SelectorThread, ACTIVE, 0 children, 73day 22:57:25.136(6,389,845,136ms))
+14:31:16,066 ERROR [exautil.lifecycle.LifeCycleObject:79][Thread-30] /ExaBus.2/SocketContainer.2/mstSender/tranferPool/SelectorThread.1: java.io.IOException: End Of Stream
+	at exabus.engine.socket.io.nioutil.ChannelUtil.readJsonList():43
+	at exabus.adapter.json.JSONNioInputStream.read():27
+	at exabus.api.socket.io.MsgRecver.recv():42
+	at exabus.engine.socket.nioserver.EBNioServerSession.tryToLogin():148
+	at exabus.engine.socket.nioserver.TransferSelectorEventHandler.processSelectionKey():34
+	at exabus.engine.socket.nioserver.SelectorThread.serviceSelectedKeys():242
+	at exabus.engine.socket.nioserver.SelectorThread.run():143
+	at exautil.lifecycle.LifeCycle$Runner.run():123
+	at java.lang.Thread.run():662
+ (SelectorThread, ACTIVE, 0 children, 73day 22:57:25.137(6,389,845,137ms))
+14:31:36,468 DEBUG [exautil.lifecycle.LifeCycleObject:52][Thread-28] /ExaBus.2/SocketContainer.2/mstSender/acceptor: accepted a client (Acceptor, ACTIVE, 0 children, 73day 22:57:45.403(6,389,865,403ms))
+14:31:36,469 TRACE [exabus.adapter.json.JSONNioServerConn:30][Thread-28] socketChannel=java.nio.channels.SocketChannel[connected local=/11.71.35.208:7900 remote=/11.71.35.208:53252]
+14:31:36,469 TRACE [exabus.adapter.json.JSONNioServerConn:31][Thread-28] props=null
+14:31:36,470 TRACE [exautil.lifecycle.LifeCycleObject:63][Thread-32] /ExaBus.2/SocketContainer.2/mstSender/tranferPool/SelectorThread.2: registered a session: SelectionKey=1919131913:  (SelectorThread, ACTIVE, 0 children, 73day 22:57:45.537(6,389,865,537ms))
+14:31:39,549 TRACE [exautil.lifecycle.LifeCycleObject:63][Thread-32] /ExaBus.2/SocketContainer.2/mstSender/tranferPool/SelectorThread.2: closes channel=java.nio.channels.SocketChannel[connected local=/11.71.35.208:7900 remote=/11.71.35.208:53252] (SelectorThread, ACTIVE, 0 children, 73day 22:57:48.616(6,389,868,616ms))
+14:31:39,550 TRACE [exautil.lifecycle.LifeCycleObject:63][Thread-32] /ExaBus.2/SocketContainer.2/mstSender/tranferPool/SelectorThread.2: cancels SelectionKey=sun.nio.ch.SelectionKeyImpl@7263a109 (SelectorThread, ACTIVE, 0 children, 73day 22:57:48.617(6,389,868,617ms))
+14:31:39,550 ERROR [exautil.lifecycle.LifeCycleObject:79][Thread-32] /ExaBus.2/SocketContainer.2/mstSender/tranferPool/SelectorThread.2: java.io.IOException: End Of Stream
+	at exabus.engine.socket.io.nioutil.ChannelUtil.readJsonList():43
+	at exabus.adapter.json.JSONNioInputStream.read():27
+	at exabus.api.socket.io.MsgRecver.recv():42
+	at exabus.engine.socket.nioserver.EBNioServerSession.tryToLogin():148
+	at exabus.engine.socket.nioserver.TransferSelectorEventHandler.processSelectionKey():34
+	at exabus.engine.socket.nioserver.SelectorThread.serviceSelectedKeys():242
+	at exabus.engine.socket.nioserver.SelectorThread.run():143
+	at exautil.lifecycle.LifeCycle$Runner.run():123
+	at java.lang.Thread.run():662
+ (SelectorThread, ACTIVE, 0 children, 73day 22:57:48.617(6,389,868,617ms))
+14:31:50,696 DEBUG [exautil.lifecycle.LifeCycleObject:52][Thread-28] /ExaBus.2/SocketContainer.2/mstSender/acceptor: accepted a client (Acceptor, ACTIVE, 0 children, 73day 22:57:59.631(6,389,879,631ms))
+14:31:50,697 TRACE [exabus.adapter.json.JSONNioServerConn:30][Thread-28] socketChannel=java.nio.channels.SocketChannel[connected local=/11.71.35.210:7900 remote=/11.71.35.210:53268]
+14:31:50,697 TRACE [exabus.adapter.json.JSONNioServerConn:31][Thread-28] props=null
+14:31:50,703 TRACE [exautil.lifecycle.LifeCycleObject:63][Thread-30] /ExaBus.2/SocketContainer.2/mstSender/tranferPool/SelectorThread.1: registered a session: SelectionKey=670138544:  (SelectorThread, ACTIVE, 0 children, 73day 22:57:59.774(6,389,879,774ms))
+14:31:50,703 TRACE [exautil.lifecycle.LifeCycleObject:63][Thread-30] /ExaBus.2/SocketContainer.2/mstSender/tranferPool/SelectorThread.1: closes channel=java.nio.channels.SocketChannel[connected local=/11.71.35.210:7900 remote=/11.71.35.210:53268] (SelectorThread, ACTIVE, 0 children, 73day 22:57:59.774(6,389,879,774ms))
+14:31:50,704 TRACE [exautil.lifecycle.LifeCycleObject:63][Thread-30] /ExaBus.2/SocketContainer.2/mstSender/tranferPool/SelectorThread.1: cancels SelectionKey=sun.nio.ch.SelectionKeyImpl@27f180b0 (SelectorThread, ACTIVE, 0 children, 73day 22:57:59.775(6,389,879,775ms))
+14:31:50,704 ERROR [exautil.lifecycle.LifeCycleObject:79][Thread-30] /ExaBus.2/SocketContainer.2/mstSender/tranferPool/SelectorThread.1: java.io.IOException: End Of Stream
+	at exabus.engine.socket.io.nioutil.ChannelUtil.readJsonList():43
+	at exabus.adapter.json.JSONNioInputStream.read():27
+	at exabus.api.socket.io.MsgRecver.recv():42
+	at exabus.engine.socket.nioserver.EBNioServerSession.tryToLogin():148
+	at exabus.engine.socket.nioserver.TransferSelectorEventHandler.processSelectionKey():34
+	at exabus.engine.socket.nioserver.SelectorThread.serviceSelectedKeys():242
+	at exabus.engine.socket.nioserver.SelectorThread.run():143
+	at exautil.lifecycle.LifeCycle$Runner.run():123
+	at java.lang.Thread.run():662
+ (SelectorThread, ACTIVE, 0 children, 73day 22:57:59.775(6,389,879,775ms))
+
+
+
+
+16:00:06,610 TRACE [exabus.adapter.json.JSONNioServerConn:30][Thread-28] socketChannel=java.nio.channels.SocketChannel[connected local=/127.0.0.1:7900 remote=/127.0.0.1:62019]
+16:00:06,610 TRACE [exabus.adapter.json.JSONNioServerConn:31][Thread-28] props=null
+16:00:06,610 TRACE [exautil.lifecycle.LifeCycleObject:63][Thread-32] /ExaBus.2/SocketContainer.2/mstSender/tranferPool/SelectorThread.2: registered a session: SelectionKey=1173914285:  (SelectorThread, ACTIVE, 0 children, 74day 00:26:15.677(6,395,175,677ms))
+16:00:09,910 TRACE [exautil.lifecycle.LifeCycleObject:63][Thread-32] /ExaBus.2/SocketContainer.2/mstSender/tranferPool/SelectorThread.2: closes channel=java.nio.channels.SocketChannel[connected local=/127.0.0.1:7900 remote=/127.0.0.1:62019] (SelectorThread, ACTIVE, 0 children, 74day 00:26:18.977(6,395,178,977ms))
+16:00:09,910 TRACE [exautil.lifecycle.LifeCycleObject:63][Thread-32] /ExaBus.2/SocketContainer.2/mstSender/tranferPool/SelectorThread.2: cancels SelectionKey=sun.nio.ch.SelectionKeyImpl@45f882ad (SelectorThread, ACTIVE, 0 children, 74day 00:26:18.977(6,395,178,977ms))
+16:00:09,911 ERROR [exautil.lifecycle.LifeCycleObject:79][Thread-32] /ExaBus.2/SocketContainer.2/mstSender/tranferPool/SelectorThread.2: java.io.IOException: End Of Stream
+	at exabus.engine.socket.io.nioutil.ChannelUtil.readJsonList():43
+	at exabus.adapter.json.JSONNioInputStream.read():27
+	at exabus.api.socket.io.MsgRecver.recv():42
+	at exabus.engine.socket.nioserver.EBNioServerSession.tryToLogin():148
+	at exabus.engine.socket.nioserver.TransferSelectorEventHandler.processSelectionKey():34
+	at exabus.engine.socket.nioserver.SelectorThread.serviceSelectedKeys():242
+	at exabus.engine.socket.nioserver.SelectorThread.run():143
+	at exautil.lifecycle.LifeCycle$Runner.run():123
+	at java.lang.Thread.run():662
+ (SelectorThread, ACTIVE, 0 children, 74day 00:26:18.978(6,395,178,978ms))
+16:01:19,887 DEBUG [exautil.lifecycle.LifeCycleObject:52][Thread-28] /ExaBus.2/SocketContainer.2/mstSender/acceptor: accepted a client (Acceptor, ACTIVE, 0 children, 74day 00:27:28.822(6,395,248,822ms))
+16:01:19,888 TRACE [exabus.adapter.json.JSONNioServerConn:30][Thread-28] socketChannel=java.nio.channels.SocketChannel[connected local=/127.0.0.1:7900 remote=/127.0.0.1:62129]
+16:01:19,888 TRACE [exabus.adapter.json.JSONNioServerConn:31][Thread-28] props=null
+16:01:19,889 TRACE [exautil.lifecycle.LifeCycleObject:63][Thread-30] /ExaBus.2/SocketContainer.2/mstSender/tranferPool/SelectorThread.1: registered a session: SelectionKey=66937323:  (SelectorThread, ACTIVE, 0 children, 74day 00:27:28.960(6,395,248,960ms))
+16:01:23,612 TRACE [exautil.lifecycle.LifeCycleObject:63][Thread-30] /ExaBus.2/SocketContainer.2/mstSender/tranferPool/SelectorThread.1: closes channel=java.nio.channels.SocketChannel[connected local=/127.0.0.1:7900 remote=/127.0.0.1:62129] (SelectorThread, ACTIVE, 0 children, 74day 00:27:32.683(6,395,252,683ms))
+16:01:23,613 TRACE [exautil.lifecycle.LifeCycleObject:63][Thread-30] /ExaBus.2/SocketContainer.2/mstSender/tranferPool/SelectorThread.1: cancels SelectionKey=sun.nio.ch.SelectionKeyImpl@3fd61eb (SelectorThread, ACTIVE, 0 children, 74day 00:27:32.684(6,395,252,684ms))
+16:01:23,613 ERROR [exautil.lifecycle.LifeCycleObject:79][Thread-30] /ExaBus.2/SocketContainer.2/mstSender/tranferPool/SelectorThread.1: java.io.IOException: End Of Stream
+	at exabus.engine.socket.io.nioutil.ChannelUtil.readJsonList():43
+	at exabus.adapter.json.JSONNioInputStream.read():27
+	at exabus.api.socket.io.MsgRecver.recv():42
+	at exabus.engine.socket.nioserver.EBNioServerSession.tryToLogin():148
+	at exabus.engine.socket.nioserver.TransferSelectorEventHandler.processSelectionKey():34
+	at exabus.engine.socket.nioserver.SelectorThread.serviceSelectedKeys():242
+	at exabus.engine.socket.nioserver.SelectorThread.run():143
+	at exautil.lifecycle.LifeCycle$Runner.run():123
+	at java.lang.Thread.run():662
+ (SelectorThread, ACTIVE, 0 children, 74day 00:27:32.684(6,395,252,684ms))
+16:14:02,341 DEBUG [exautil.lifecycle.LifeCycleObject:52][Thread-28] /ExaBus.2/SocketContainer.2/mstSender/acceptor: accepted a client (Acceptor, ACTIVE, 0 children, 74day 00:40:11.276(6,396,011,276ms))
+16:14:02,342 TRACE [exabus.adapter.json.JSONNioServerConn:30][Thread-28] socketChannel=java.nio.channels.SocketChannel[connected local=/11.71.35.210:7900 remote=/11.71.35.206:52077]
+16:14:02,342 TRACE [exabus.adapter.json.JSONNioServerConn:31][Thread-28] props=null
+16:14:02,348 TRACE [exautil.lifecycle.LifeCycleObject:63][Thread-32] /ExaBus.2/SocketContainer.2/mstSender/tranferPool/SelectorThread.2: registered a session: SelectionKey=1989828989:  (SelectorThread, ACTIVE, 0 children, 74day 00:40:11.415(6,396,011,415ms))
+16:14:03,791 TRACE [exautil.lifecycle.LifeCycleObject:63][Thread-32] /ExaBus.2/SocketContainer.2/mstSender/tranferPool/SelectorThread.2: closes channel=java.nio.channels.SocketChannel[connected local=/11.71.35.210:7900 remote=/11.71.35.206:52077] (SelectorThread, ACTIVE, 0 children, 74day 00:40:12.858(6,396,012,858ms))
+16:14:03,791 TRACE [exautil.lifecycle.LifeCycleObject:63][Thread-32] /ExaBus.2/SocketContainer.2/mstSender/tranferPool/SelectorThread.2: cancels SelectionKey=sun.nio.ch.SelectionKeyImpl@769a617d (SelectorThread, ACTIVE, 0 children, 74day 00:40:12.858(6,396,012,858ms))
+16:14:03,792 ERROR [exautil.lifecycle.LifeCycleObject:79][Thread-32] /ExaBus.2/SocketContainer.2/mstSender/tranferPool/SelectorThread.2: java.io.IOException: End Of Stream
+	at exabus.engine.socket.io.nioutil.ChannelUtil.readJsonList():43
+	at exabus.adapter.json.JSONNioInputStream.read():27
+	at exabus.api.socket.io.MsgRecver.recv():42
+	at exabus.engine.socket.nioserver.EBNioServerSession.tryToLogin():148
+	at exabus.engine.socket.nioserver.TransferSelectorEventHandler.processSelectionKey():34
+	at exabus.engine.socket.nioserver.SelectorThread.serviceSelectedKeys():242
+	at exabus.engine.socket.nioserver.SelectorThread.run():143
+	at exautil.lifecycle.LifeCycle$Runner.run():123
+	at java.lang.Thread.run():662
+ (SelectorThread, ACTIVE, 0 children, 74day 00:40:12.859(6,396,012,859ms))
+
+
+
+
+
+
+17:23:22,071 DEBUG [exautil.lifecycle.LifeCycleObject:52][Thread-28] /ExaBus.2/SocketContainer.2/mstSender/acceptor: accepted a client (Acceptor, ACTIVE, 0 children, 74day 01:49:31.006(6,400,171,006ms))
+17:23:22,072 TRACE [exabus.adapter.json.JSONNioServerConn:30][Thread-28] socketChannel=java.nio.channels.SocketChannel[connected local=/11.71.35.210:7900 remote=/12.57.200.86:51033]
+17:23:22,072 TRACE [exabus.adapter.json.JSONNioServerConn:31][Thread-28] props=null
+17:23:22,072 TRACE [exautil.lifecycle.LifeCycleObject:63][Thread-30] /ExaBus.2/SocketContainer.2/mstSender/tranferPool/SelectorThread.1: registered a session: SelectionKey=1791051340:  (SelectorThread, ACTIVE, 0 children, 74day 01:49:31.143(6,400,171,143ms))
+17:23:26,001 TRACE [exautil.lifecycle.LifeCycleObject:63][Thread-30] /ExaBus.2/SocketContainer.2/mstSender/tranferPool/SelectorThread.1: closes channel=java.nio.channels.SocketChannel[connected local=/11.71.35.210:7900 remote=/12.57.200.86:51033] (SelectorThread, ACTIVE, 0 children, 74day 01:49:35.072(6,400,175,072ms))
+17:23:26,001 TRACE [exautil.lifecycle.LifeCycleObject:63][Thread-30] /ExaBus.2/SocketContainer.2/mstSender/tranferPool/SelectorThread.1: cancels SelectionKey=sun.nio.ch.SelectionKeyImpl@6ac1464c (SelectorThread, ACTIVE, 0 children, 74day 01:49:35.072(6,400,175,072ms))
+17:23:26,001 ERROR [exautil.lifecycle.LifeCycleObject:79][Thread-30] /ExaBus.2/SocketContainer.2/mstSender/tranferPool/SelectorThread.1: java.io.IOException: End Of Stream
+	at exabus.engine.socket.io.nioutil.ChannelUtil.readJsonList():43
+	at exabus.adapter.json.JSONNioInputStream.read():27
+	at exabus.api.socket.io.MsgRecver.recv():42
+	at exabus.engine.socket.nioserver.EBNioServerSession.tryToLogin():148
+	at exabus.engine.socket.nioserver.TransferSelectorEventHandler.processSelectionKey():34
+	at exabus.engine.socket.nioserver.SelectorThread.serviceSelectedKeys():242
+	at exabus.engine.socket.nioserver.SelectorThread.run():143
+	at exautil.lifecycle.LifeCycle$Runner.run():123
+	at java.lang.Thread.run():662
+ (SelectorThread, ACTIVE, 0 children, 74day 01:49:35.072(6,400,175,072ms))
+
+
+
+
+
+
+[2015-08-06 09:21:52,400] sent outTableReq: {"QueueEntry":true,"_msgType":"outTableReq","createdTime":1438820512398,"timeout":0,"srcId":"SITE_DSR","srcSsKey":"12.57.200.86","dstId":"SITE_DSR","dstSsKey":null,"msg":{
+	"MSG":{
+	"sqlId":"mstGoo.insertMstGoo21030m","records":{
+		"ORD_UNIT_CD":"EA","PRDT_STAT_CD":"S","PRDT_ID":"PROD009023","WRAP_YN":"N","TAX_TYPE_CD":"T","REG_USER_ID":"admin","CALR":"0","PRDT_STAT_GRPCD":"PRDT_STAT","PRDT_TYPE_CD":"","PRDT_HANGL_NM":"오색철판비빔밥","OM_YN":"N","TAX_TYPE_GRPCD":"TAX_TYPE","ERP_PRDT_TYPE_CD":"999","FCNT_TYPE_CD":"2","UNIT_GRPCD":"PRDT_UNIT","SET_MENU_YN":"Y","MAIN_CLSS_CD":"CATE009003003","PRDT_ENG_NM":"","PRDT_SCL":"","UNIT_QTY":"","VAT_YN":"Y","FCNT_PER_ORDER":"","PRDT_DESCR":"","ORD_UNIT_GRPCD":"ORD_UNIT","ORG_PLC":"","EAN_BRCD":"","UNIT_CD":"EA","PWGHT_ORD_UNIT":"","FCNT_PER_PRDT":"1"
+	}
+}
+	,"_msgType":"outTableReq","DST_ID":"SITE_DSR","SEQ_NO":"3408"
+}}
+
+[2015-08-06 09:21:52,400] sent pingReq: {"QueueEntry":true,"_msgType":"pingReq","createdTime":1438820512399,"timeout":0,"srcId":"SITE_DSR","srcSsKey":"12.57.200.86","dstId":null,"dstSsKey":"12.57.200.86","msg":{
+	"_msgType":"pingReq"
+}}
+
+[2015-08-06 09:21:52,415] recv outTableReq: {
+	"dstSsKey":"11.71.35.210","dstId":"SITE_DSR","QueueEntry":"true","createdTime":"1438820512398","srcSsKey":"11.71.35.210","srcId":"SITE_DSR","_msgType":"outTableReq","msg":{
+		"MSG":{
+			"sqlId":"mstGoo.insertMstGoo21030m","records":{
+				"ORD_UNIT_CD":"EA","PRDT_STAT_CD":"S","PRDT_ID":"PROD009023","WRAP_YN":"N","TAX_TYPE_CD":"T","REG_USER_ID":"admin","CALR":"0","PRDT_STAT_GRPCD":"PRDT_STAT","PRDT_TYPE_CD":"","PRDT_HANGL_NM":"오색철판비빔밥","OM_YN":"N","TAX_TYPE_GRPCD":"TAX_TYPE","ERP_PRDT_TYPE_CD":"999","FCNT_TYPE_CD":"2","UNIT_GRPCD":"PRDT_UNIT","SET_MENU_YN":"Y","MAIN_CLSS_CD":"CATE009003003","PRDT_ENG_NM":"","PRDT_SCL":"","UNIT_QTY":"","VAT_YN":"Y","FCNT_PER_ORDER":"","PRDT_DESCR":"","ORD_UNIT_GRPCD":"ORD_UNIT","ORG_PLC":"","EAN_BRCD":"","UNIT_CD":"EA","PWGHT_ORD_UNIT":"","FCNT_PER_PRDT":"1"
+			}
+		}
+		,"_msgType":"outTableReq","DST_ID":"SITE_DSR","SEQ_NO":"3408"
+	}
+	,"timeout":"0"
+}
+
+[2015-08-06 09:21:52,425] recv outTableRes: {
+	"dstSsKey":"11.71.35.210","dstId":"SITE_DSR","QueueEntry":"true","createdTime":"1438820516426","srcSsKey":null,"srcId":null,"_msgType":"outTableRes","msg":{
+		"STAT":"O","_msgType":"outTableRes","DST_ID":"SITE_DSR","SEQ_NO":"3408"
+	}
+	,"timeout":"0"
+}
+
+
+
+09:21:52,400 TRACE [exautil.lifecycle.LifeCycleObject:63][Thread-64] /ExaBus.2/ApplicationContainer.3/app/defaultEQ: initializing the bean 'outTableSendTrigger'.. (ExaQueue, ACTIVE, 2 children, 79day 17:48:01.198(6,889,681,198ms))
+09:21:52,402 TRACE [exautil.lifecycle.LifeCycleObject:63][Thread-64] /ExaBus.2/ApplicationContainer.3/app/defaultEQ: BizBean outTableSendTrigger done. (ExaQueue, ACTIVE, 2 children, 79day 17:48:01.200(6,889,681,200ms))
+
+09:21:52,416 TRACE [exautil.lifecycle.LifeCycleObject:63][Thread-336] /ExaBus.2/SocketContainer.2/mstSender/ExaQueueList.1/SITE_DSR/bizBeanThread: Message rule is not found for received message 'outTableReq' (BizBeanThread, ACTIVE, 0 children, 79day 17:47:56.450(6,889,676,450ms))
+09:21:52,426 TRACE [exautil.lifecycle.LifeCycleObject:63][Thread-336] /ExaBus.2/SocketContainer.2/mstSender/ExaQueueList.1/SITE_DSR: initializing the bean 'outTableSendCronjob'.. (ExaQueue, ACTIVE, 4 children, 79day 17:47:56.564(6,889,676,564ms))
+09:21:52,429 TRACE [exautil.lifecycle.LifeCycleObject:63][Thread-336] /ExaBus.2/SocketContainer.2/mstSender/ExaQueueList.1/SITE_DSR: BizBean outTableSendCronjob done. (ExaQueue, ACTIVE, 4 children, 79day 17:47:56.567(6,889,676,567ms))
+
+----
+
+
+[2015-07-09 00:08:12,816] sent outTableReq: {"QueueEntry":true,"_msgType":"outTableReq","createdTime":1436368092732,"timeout":0,"srcId":"SITE_DCR5","srcSsKey":"127.0.0.1","dstId":"SITE_DCR5","dstSsKey":null,"msg":{
+	"MSG":{
+	"sqlId":"comCmn.insertComCmn21050m","records":{
+		"TRX_AUTH_YN":"1","EXCEL_AUTH_YN":"1","REG_AUTH_YN":"1","OT_PT_AUTH_YN":"1","REG_USER_ID":"admin","AUTH_CODE":"00","SITE_ID":"SITE_DCR5","MENU_ID":"MRC21010M","DEL_AUTH_YN":"1","QRY_AUTH_YN":"1","ALTR_AUTH_YN":"1"
+	}
+}
+	,"_msgType":"outTableReq","DST_ID":"SITE_DCR5","SEQ_NO":"662"
+}}
+
+[2015-07-09 00:08:12,820] recv outTableReq: {
+	"dstSsKey":"localhost","dstId":"SITE_DCR5","QueueEntry":"true","createdTime":"1436368092732","srcSsKey":"localhost","srcId":"SITE_DCR5","_msgType":"outTableReq","msg":{
+		"MSG":{
+			"sqlId":"comCmn.insertComCmn21050m","records":{
+				"TRX_AUTH_YN":"1","EXCEL_AUTH_YN":"1","REG_AUTH_YN":"1","OT_PT_AUTH_YN":"1","REG_USER_ID":"admin","AUTH_CODE":"00","SITE_ID":"SITE_DCR5","MENU_ID":"MRC21010M","DEL_AUTH_YN":"1","QRY_AUTH_YN":"1","ALTR_AUTH_YN":"1"
+			}
+		}
+		,"_msgType":"outTableReq","DST_ID":"SITE_DCR5","SEQ_NO":"662"
+	}
+	,"timeout":"0"
+}
+
+------
+
+
+:::::::::: Client ::::::::::
+ 
+[2015-07-09 00:08:33,119] recv outTableReq: {
+	"dstSsKey":null,"dstId":"SITE_SDS","QueueEntry":"true","createdTime":"1436368113118","srcSsKey":"127.0.0.1","srcId":"SITE_SDS","_msgType":"outTableReq","msg":{
+		"MSG":{
+			"sqlId":"comCmn.insertComCmn21050m","records":{
+				"TRX_AUTH_YN":"1","EXCEL_AUTH_YN":"1","REG_AUTH_YN":"1","OT_PT_AUTH_YN":"1","REG_USER_ID":"admin","SITE_ID":"SITE_SDS","AUTH_CODE":"00","MENU_ID":"CND1310M","DEL_AUTH_YN":"1","QRY_AUTH_YN":"1","ALTR_AUTH_YN":"1"
+			}
+		}
+		,"_msgType":"outTableReq","DST_ID":"SITE_SDS","SEQ_NO":"940"
+	}
+	,"timeout":"0"
+}
+
+[2015-07-09 00:08:33,121] sent outTableReq: {"QueueEntry":true,"_msgType":"outTableReq","createdTime":1436368113118,"timeout":0,"srcId":"SITE_SDS","srcSsKey":"localhost","dstId":"SITE_SDS","dstSsKey":"localhost","msg":{
+	"MSG":{
+		"sqlId":"comCmn.insertComCmn21050m","records":{
+			"TRX_AUTH_YN":"1","EXCEL_AUTH_YN":"1","REG_AUTH_YN":"1","OT_PT_AUTH_YN":"1","REG_USER_ID":"admin","SITE_ID":"SITE_SDS","AUTH_CODE":"00","MENU_ID":"CND1310M","DEL_AUTH_YN":"1","QRY_AUTH_YN":"1","ALTR_AUTH_YN":"1"
+		}
+	}
+	,"_msgType":"outTableReq","DST_ID":"SITE_SDS","SEQ_NO":"940"
+}}
+
+[2015-07-09 00:08:33,123] sent outTableRes: {"QueueEntry":true,"_msgType":"outTableRes","createdTime":1436368113122,"timeout":0,"srcId":null,"srcSsKey":null,"dstId":"SITE_SDS","dstSsKey":"localhost","msg":{
+	"STAT":"X","ERR_MSG":"PRIMARY KEY 제약 조건 'PK_T_MGT_MENU_AUTH_M'을(를) 위반했습니다. 개체 'dbo.T_MGT_MENU_AUTH_M'에 중복 키를 삽입할 수 없습니다.","ERR_CD":"ERR-999","_msgType":"outTableRes","DST_ID":"SITE_SDS","SEQ_NO":"940"
+}}
+
+00:08:33,120 TRACE [exautil.lifecycle.LifeCycleObject:63][Thread-30] /ExaBus.2/SocketContainer.1/mstRecver/ExaQueueList.1/SITE_SDS: initializing the bean 'mstWriteBean'.. (ExaQueue, ACTIVE, 4 children, 43day 06:55:29.985(3,740,129,985ms))
+00:08:33,121 TRACE [exautil.sqlmgr.SqlExecutor:124][Thread-30] PRIMARY KEY 제약 조건 'PK_T_MGT_MENU_AUTH_M'을(를) 위반했습니다. 개체 'dbo.T_MGT_MENU_AUTH_M'에 중복 키를 삽입할 수 없습니다.: error code=2627
+00:08:33,122 ERROR [toms.exabus.service.sql.bean.SqlExecutorBean:82][Thread-30] com.microsoft.sqlserver.jdbc.SQLServerException: PRIMARY KEY 제약 조건 'PK_T_MGT_MENU_AUTH_M'을(를) 위반했습니다. 개체 'dbo.T_MGT_MENU_AUTH_M'에 중복 키를 삽입할 수 없습니다.
+	at com.microsoft.sqlserver.jdbc.SQLServerException.makeFromDatabaseError():196
+	at com.microsoft.sqlserver.jdbc.SQLServerStatement.getNextResult():1454
+	at com.microsoft.sqlserver.jdbc.SQLServerPreparedStatement.doExecutePreparedStatement():388
+	at com.microsoft.sqlserver.jdbc.SQLServerPreparedStatement$PrepStmtExecCmd.doExecute():338
+	at com.microsoft.sqlserver.jdbc.TDSCommand.execute():4026
+	at com.microsoft.sqlserver.jdbc.SQLServerConnection.executeCommand():1416
+	at com.microsoft.sqlserver.jdbc.SQLServerStatement.executeCommand():185
+	at com.microsoft.sqlserver.jdbc.SQLServerStatement.executeStatement():160
+	at com.microsoft.sqlserver.jdbc.SQLServerPreparedStatement.executeQuery():281
+	at org.apache.commons.dbcp.DelegatingPreparedStatement.executeQuery():93
+	at exautil.sqlmgr.SqlExecutor.executeQuery():121
+	at exautil.sqlmgr.SqlExecutor.queryList():365
+	at exautil.sqlmgr.SqlExecutor.query():259
+	at exautil.sqlmgr.SqlExecutor.queryDefaultSqls():545
+	at exautil.sqlmgr.SqlExecutor.queryDefaultSqls():519
+	at exautil.sqlmgr.SqlExecutor.queryMultiSqls():483
+	at exautil.sqlmgr.SqlConn.query():122
+	at toms.exabus.service.sql.bean.SqlExecutorBean.respond():62
+	at exabus.engine.com.workerthread.BizBeanThread.invokeResAsyncBizBean():122
+	at exabus.engine.com.workerthread.BizBeanThread.run():96
+	at exautil.lifecycle.LifeCycle$Runner.run():123
+	at java.lang.Thread.run():662
+
+00:08:33,122 TRACE [exautil.lifecycle.LifeCycleObject:63][Thread-30] /ExaBus.2/SocketContainer.1/mstRecver/ExaQueueList.1/SITE_SDS: BizBean mstWriteBean done. (ExaQueue, ACTIVE, 4 children, 43day 06:55:29.987(3,740,129,987ms))
+
+
+ 

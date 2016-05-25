@@ -1,0 +1,24 @@
+package msgrouter.engine.socket.server;
+
+import elastic.util.net.SocketUtil;
+import elastic.util.util.TechException;
+
+public interface AbstractServerSessionFactory {
+	/**
+	 * Called whenever a connection is accepted on a server socket for which
+	 * this factory was registered.
+	 * 
+	 * @param server
+	 *            TODO
+	 * @param selThread
+	 *            TODO
+	 * @param channel
+	 *            the server socket channel that represents the server-side of
+	 *            the connection.
+	 * @return a protocol handler instance (either new or pooled) that will
+	 *         service the read and write operations on the socket. Returning
+	 *         null will cause the server to refuse the connection.
+	 */
+	public AbstractServerSession createSession(Server server,
+			SelectorThr selThread, SocketUtil su) throws TechException;
+}

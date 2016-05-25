@@ -1,0 +1,292 @@
+package msgrouter.admin.server;
+
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
+
+import org.apache.log4j.Logger;
+
+import elastic.util.authmanager.AuthEntry;
+import elastic.util.authmanager.AuthManager;
+import elastic.util.authmanager.AuthResult;
+import elastic.util.authmanager.data.GroupConfig;
+import elastic.util.beanmgr.BeanMgr;
+import elastic.util.sqlmgr.SqlConn;
+import elastic.util.sqlmgr.SqlConnPool;
+import elastic.util.sqlmgr.dataset.DBRow;
+import elastic.util.util.DateUtil;
+import elastic.util.util.ErrorCodeMgr;
+import elastic.util.util.ExceptionDetail;
+import elastic.util.util.StringUtil;
+import elastic.util.util.TechException;
+import msgrouter.engine.MsgRouter;
+import msgrouter.engine.config.ServiceConfig;
+
+public class AuthEntryAdmin {
+	private static final Logger LOG = Logger.getLogger(AuthEntryAdmin.class);
+
+	private AuthManager authMgr = null;
+	private SqlConnPool sqlConnPool = null;
+	private List<AuthEntry> aeList = null;
+	private final List<String> idList = new ArrayList<String>();
+	private String[] idArray = null;
+
+	public static final String KEY_ONLINE = "ONLINE";
+	public static final String KEY_IP = "IP";
+	private static final String KEY_SERVICE_ID = "SERVICE_ID";
+	private static final String KEY_USE_YN = "USE_YN";
+	private static final String KEY_REG_DT = "REG_DT";
+	private static final String KEY_UPDT_DT = "UPDT_DT";
+
+	public AuthEntryAdmin(ServiceConfig svcConf) throws TechException {
+		String amConfFullPath = svcConf.getAuthManagerConfigPath();
+		this.authMgr = new AuthManager(amConfFullPath, (ErrorCodeMgr) BeanMgr.getInstance().get("errorCodeMgr"));
+		this.sqlConnPool = MsgRouter.getInstance().getSqlConnPool(svcConf.getLogDbPoolName());
+
+		this.aeList = authMgr.getAuthEntryList(svcConf.getUserIds(), svcConf.getGroupIds());
+		this.idArray = new String[aeList.size()];
+
+		for (int i = 0; i < aeList.size(); i++) {
+			AuthEntry ae = aeList.get(i);
+			ae.put(KEY_SERVICE_ID, svcConf.getServiceId());
+
+			this.idArray[i] = ae.getId();
+			this.idList.add(ae.getId());
+		}
+
+		if (sqlConnPool != null) {
+			dbSync(svcConf);
+		}
+	}
+
+	private void dbSync(ServiceConfig svcConf) {
+		if (sqlConnPool == null) {
+			return;
+		}
+		SqlConn sqlConn = null;
+		try {
+			Map params = new DBRow();
+			params.put(KEY_SERVICE_ID, svcConf.getServiceId());
+
+			sqlConn = sqlConnPool.getSqlConn();
+			List<Map> dbRecords = sqlConn.queryList("admin.selectAE", params);
+
+			for (int i = 0; i < aeList.size(); i++) {
+				AuthEntry ae = aeList.get(i);
+				String dbLoginId = null;
+				boolean inDB = false;
+
+				for (int r = 0; r < dbRecords.size(); r++) {
+					Map dbRecord = dbRecords.get(r);
+					dbLoginId = (String) dbRecord.get(AuthEntry.KEY_ID);
+					if (dbLoginId.equals(ae.getId())) {
+						inDB = true;
+						break;
+					}
+				}
+
+				if (!inDB) {
+					Map aeMap = ae.toMap();
+					Map pRecord = new DBRow();
+					pRecord.putAll(aeMap);
+					pRecord.put(KEY_REG_DT, DateUtil.toString(System.currentTimeMillis()));
+					sqlConn.queryUpdate("admin.insertAE", pRecord);
+				}
+			}
+
+			for (int r = 0; r < dbRecords.size(); r++) {
+				Map dbRecord = dbRecords.get(r);
+				String dbLoginId = (String) dbRecord.get(AuthEntry.KEY_ID);
+				boolean inList = false;
+				for (int i = 0; i < aeList.size(); i++) {
+					AuthEntry ae = aeList.get(i);
+					if (dbLoginId.equals(ae.getId())) {
+						inList = true;
+						break;
+					}
+				}
+				dbRecord.put(KEY_UPDT_DT, DateUtil.toString(System.currentTimeMillis()));
+				dbRecord.put(AuthEntryAdmin.KEY_USE_YN, inList ? "Y" : "N");
+				sqlConn.queryUpdate("admin.updateAE", dbRecord);
+			}
+		} catch (Exception e) {
+			LOG.error(ExceptionDetail.getDetail(e));
+		} finally {
+			if (sqlConn != null) {
+				sqlConn.close();
+			}
+		}
+	}
+
+	private static Map convert(Map map) {
+		Map ret = new HashMap();
+		Iterator it = map.entrySet().iterator();
+		while (it.hasNext()) {
+			Entry entry = (Entry) it.next();
+			Object k = entry.getKey();
+			Object v = entry.getValue();
+			if (v instanceof Boolean) {
+				if (new Boolean(true).equals((Boolean) v))
+					ret.put(k, "Y");
+				else
+					ret.put(k, "N");
+			} else {
+				ret.put(k, v);
+			}
+		}
+		return ret;
+	}
+
+	public boolean isAvailableLoginId(String loginId) {
+		return authMgr.containsInACL(aeList, null, loginId);
+	}
+
+	public AuthEntry getAuthEntry(String id) {
+		if (aeList != null) {
+			int size = aeList.size();
+			for (int i = 0; i < size; i++) {
+				AuthEntry ae = aeList.get(i);
+				if (ae != null) {
+					if (ae.getId().equals(id)) {
+						return ae;
+					}
+				}
+			}
+		}
+		return null;
+	}
+
+	public List<AuthEntry> getAuthEntryList() {
+		return aeList;
+	}
+
+	/**
+	 * @deprecated Use getLoginIdArray()
+	 * @return
+	 */
+	public String[] getLoginIds() {
+		return idArray;
+	}
+
+	public String[] getLoginIdArray() {
+		return idArray;
+	}
+
+	public List<String> getLoginIdList() {
+		return idList;
+	}
+
+	public void writeUserDatasText(String userDatasText) throws TechException {
+		authMgr.writeUserDatasText(userDatasText);
+	}
+
+	public String readGroupDataText(String groupId) throws IOException {
+		return authMgr.readGroupDataText(groupId);
+	}
+
+	public void writeAuthMgrConfText(String amConfText) throws TechException {
+		authMgr.writeAuthMgrConfText(amConfText);
+	}
+
+	public GroupConfig getGroupConfig(String groupId) {
+		return authMgr.getGroupConfig(groupId);
+	}
+
+	public String readUserDatasText() throws IOException {
+		return authMgr.readUserDatasText();
+	}
+
+	public String readAuthMgrConfText() throws IOException {
+		return authMgr.readAuthMgrConfText();
+	}
+
+	public void deleteGroupDataText(String groupId) {
+		authMgr.deleteGroupDataText(groupId);
+	}
+
+	public void writeGroupDataText(String groupId, String desc, String groupDataText, String encoding)
+			throws TechException {
+		authMgr.writeGroupDataText(groupId, desc, groupDataText, encoding);
+	}
+
+	public String svc_getAuthMgrConfText() throws IOException {
+		return authMgr.readAuthMgrConfText();
+	}
+
+	public String svc_getUserDatasText() throws IOException {
+		return authMgr.readUserDatasText();
+	}
+
+	public String svc_getGroupDataText(String groupId) throws IOException {
+		return authMgr.readGroupDataText(groupId);
+	}
+
+	public AuthResult checkAndSetState(String id, String pw, String remoteIp) {
+		AuthResult authResult = authMgr.check(aeList, null, id, pw);
+
+		if (id != null) {
+			AuthEntry ae = getAuthEntry(id);
+			if (ae != null) {
+				if (!StringUtil.isEmpty(remoteIp))
+					ae.put(AuthEntryAdmin.KEY_IP, remoteIp);
+
+				if (AuthResult.CD_0_SUCCESS.equals((String) authResult.get(AuthResult.KEY_CD))) {
+					ae.put(AuthEntryAdmin.KEY_ONLINE, true);
+				} else {
+					ae.put(AuthEntryAdmin.KEY_ONLINE, false);
+				}
+				updateStateOnDb(ae);
+			}
+		}
+
+		return authResult;
+	}
+
+	public void setOnLine(String id, String remoteIp) {
+		AuthEntry ae = getAuthEntry(id);
+		if (ae != null) {
+			ae.put(AuthEntryAdmin.KEY_IP, remoteIp);
+			ae.put(AuthEntryAdmin.KEY_ONLINE, true);
+			updateStateOnDb(ae);
+		}
+	}
+
+	public void setOffLine(String id) {
+		AuthEntry ae = getAuthEntry(id);
+		if (ae != null) {
+			ae.put(AuthEntryAdmin.KEY_ONLINE, false);
+			updateStateOnDb(ae);
+		}
+	}
+
+	private void updateStateOnDb(AuthEntry ae) {
+		if (sqlConnPool != null && ae != null) {
+			SqlConn sqlConn = null;
+
+			try {
+				Map aeMap = ae.toMap();
+				Map pRecord = new DBRow();
+				pRecord.putAll(convert(aeMap));
+				pRecord.put(AuthEntry.KEY_ID, ae.getId());
+				pRecord.put(KEY_UPDT_DT, DateUtil.toString(System.currentTimeMillis()));
+				pRecord.put(AuthEntryAdmin.KEY_USE_YN, "Y");
+
+				sqlConn = sqlConnPool.getSqlConn();
+				if (LOG.isInfoEnabled()) {
+					LOG.info("updateStateOnDb(): AuthEntry=" + ae);
+				}
+				sqlConn.queryUpdate("admin.updateAE", pRecord);
+			} catch (Throwable t) {
+				LOG.error(ExceptionDetail.getDetail(t));
+			} finally {
+				if (sqlConn != null) {
+					sqlConn.close();
+				}
+			}
+		}
+	}
+}

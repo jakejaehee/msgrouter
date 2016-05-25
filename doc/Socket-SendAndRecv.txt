@@ -1,0 +1,29 @@
+
+--------------------------
+SocketServer
+--------------------------
+
+o Send messages
+    msgrouter.engine.socket.server.impl.ServerSession.send();
+
+o Receive messages
+    msgrouter.engine.socket.server.impl.TransferSelectorEventHandler.processSelectionKey();
+        msgrouter.adapter.json.JSONRecver.recv()
+
+
+--------------------------
+SocketClient
+--------------------------
+
+o Send messages
+    msgrouter.engine.socket.client.workerthread.ClientAsyncSendThr
+    run() {
+        sender.send(msg);
+    }
+
+o Receive messages
+    msgrouter.engine.socket.client.workerthread.ClientAsyncRecvThr
+    run() {
+        Message recvMsg = reader.recv();
+    }
+

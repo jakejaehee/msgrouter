@@ -1,0 +1,113 @@
+package msgrouter.engine.socket.client.workerthread;
+
+import java.io.IOException;
+import java.net.SocketException;
+
+import msgrouter.api.QueueEntry;
+import msgrouter.api.SocketConnection;
+import msgrouter.api.interfaces.Message;
+import msgrouter.api.interfaces.adapter.MessageSender;
+import msgrouter.api.interfaces.bean.ClientLoginer;
+import msgrouter.api.interfaces.bean.SentTrigger;
+import msgrouter.constant.Const;
+import msgrouter.engine.MessageLogger;
+import msgrouter.engine.MsgRouter;
+import msgrouter.engine.Service;
+import msgrouter.engine.Session;
+import elastic.util.lifecycle.LifeCycleObject;
+
+public class ClientAsyncSendThr extends LifeCycleObject implements Runnable {
+	private final Session ss;
+	private final SocketConnection conn;
+	private boolean busy = false;
+
+	public ClientAsyncSendThr(Service svc, Session session,
+			SocketConnection conn, ClientLoginer loginer) {
+		super(ClientAsyncSendThr.class);
+
+		this.ss = session;
+		this.conn = conn;
+
+		setLogger(ss.getLogger());
+	}
+
+	public void run() {
+		try {
+			while (!currentLifeCycle().isShutdownMode()
+					|| !currentLifeCycle().readyToShutdown()) {
+				try {
+					if (currentLifeCycle().sleep(Const.VAL_LOOP_SLEEP_MILLIS,
+							Const.VAL_LOOP_SLEEP_NANOS))
+						continue;
+
+					QueueEntry sendQE = null;
+					if ((sendQE = ss.peekSQ()) == null)
+						continue;
+					busy = true;
+
+					if (logTraceEnabled())
+						logTrace("sendQE has " + sendQE.getMessageCount()
+								+ " messages.");
+
+					MessageSender sender = conn.getSender();
+					Message msg = sendQE.getMessage(0);
+					if (msg != null) {
+						sender.send(msg);
+						if (logDebugEnabled()) {
+							String log = MessageLogger.toDebugingLog("sent",
+									ss, msg);
+							if (log != null)
+								logDebug(log);
+						}
+					}
+
+					if (sendQE.getMessageCount() > 0)
+						sendQE.removeMessage(0);
+
+					if (sendQE.getMessageCount() == 0)
+						ss.pollSQ();
+
+					if (msg != null) {
+						if (sendQE.getSentTriggerClass() != null) {
+							try {
+								SentTrigger trigger = (SentTrigger) MsgRouter
+										.getInstance()
+										.getBeanCache()
+										.getBean(ss.getService(), ss,
+												sendQE.getSentTriggerClass());
+								if (logTraceEnabled())
+									logTrace(SentTrigger.class.getSimpleName()
+											+ " "
+											+ sendQE.getSentTriggerClass()
+													.getName() + " executes.");
+								trigger.execute(msg);
+							} catch (Throwable t) {
+								logError(t);
+							}
+						}
+					}
+					busy = false;
+				} catch (SocketException e) {
+					logError(e);
+					return;
+				} catch (IOException e) {
+					logError(e);
+					return;
+				} catch (Throwable e) {
+					logError(e);
+				} finally {
+					busy = false;
+				}
+			} // while
+		} finally {
+			currentLifeCycle().killParent();
+		}
+	}
+
+	public void killEventHandler() {
+	}
+
+	public boolean isBusy() {
+		return busy;
+	}
+}

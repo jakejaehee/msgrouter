@@ -1,0 +1,183 @@
+package msgrouter.engine.com.workerthread;
+
+import java.util.List;
+
+import msgrouter.api.interfaces.bean.AsyncBean;
+import msgrouter.api.interfaces.bean.Bean;
+import msgrouter.api.interfaces.bean.SyncBean;
+import msgrouter.constant.Const;
+import msgrouter.engine.MsgRouter;
+import msgrouter.engine.Session;
+import msgrouter.engine.SessionRegistry;
+import msgrouter.engine.config.rule.CronjobRules;
+import msgrouter.engine.config.rule.InvokeRule;
+import msgrouter.engine.config.rule.ProcessMap;
+import msgrouter.engine.queue.NotSynchronizedQueue;
+import msgrouter.engine.queue.QueueTimeoutException;
+import elastic.util.lifecycle.LifeCycleObject;
+import elastic.util.scheduler.Schedule;
+import elastic.util.scheduler.ScheduleJob;
+import elastic.util.scheduler.Scheduler;
+import elastic.util.sqlmgr.SqlConnPool;
+import elastic.util.util.TechException;
+
+public class SessionCronjob extends LifeCycleObject implements Runnable {
+	private final SessionRegistry ssRegistry;
+	private final Scheduler scheduler;
+
+	private final NotSynchronizedQueue<AsyncBeanOnCronjobInvoker> pendingAsyncBeans = new NotSynchronizedQueue<AsyncBeanOnCronjobInvoker>();
+
+	public SessionCronjob(SessionRegistry sessionRegistry) {
+		super(SessionCronjob.class);
+
+		this.ssRegistry = sessionRegistry;
+		this.scheduler = new Scheduler();
+	}
+
+	public void run() {
+		try {
+			ssRegistry.getService().executeThreadInitializer();
+		} catch (Throwable e) {
+			throw new RuntimeException(e);
+		}
+
+		while (!currentLifeCycle().isShutdownMode()
+				|| !currentLifeCycle().readyToShutdown()) {
+			try {
+				if (currentLifeCycle().sleep(Const.VAL_LOOP_SLEEP_MILLIS,
+						Const.VAL_LOOP_SLEEP_NANOS)) {
+					continue;
+				}
+
+				handlePendingAsyncBean();
+			} catch (Throwable t) {
+				logError(t);
+			}
+		} // while
+	}
+
+	private void handlePendingAsyncBean() throws TechException,
+			QueueTimeoutException {
+		AsyncBeanOnCronjobInvoker asyncBeanInvoker = pendingAsyncBeans.poll();
+		if (asyncBeanInvoker != null) {
+			asyncBeanInvoker.execute();
+			if (asyncBeanInvoker.isRepeatable()) {
+				pendingAsyncBeans.put(asyncBeanInvoker);
+			}
+		}
+	}
+
+	public final boolean cronjobRunning(Session ss) {
+		return scheduler.jobCount(String.valueOf(ss.getKey())) > 0;
+	}
+
+	public void stopCronjob(Session ss) {
+		if (ss.logInfoEnabled())
+			ss.logInfo("cancel cronjob(s)");
+		scheduler.cancel(String.valueOf(ss.getKey()));
+	}
+
+	public void startCronjob(Session ss) {
+		List<CronjobRules> cronjobRulesList = ss.getService()
+				.getServiceConfig().getProcessMap().getCronjobRulesList();
+		if (cronjobRulesList == null) {
+			if (ss.logDebugEnabled())
+				ss.logDebug("There is no cronjob rule for the service '"
+						+ ss.getService().getServiceId() + "'");
+			return;
+		}
+
+		for (int i = 0; i < cronjobRulesList.size(); i++) {
+			CronjobRules cronjobRules = (CronjobRules) cronjobRulesList.get(i);
+			if (getClass() != cronjobRules.getCronjobClass()) {
+				continue;
+			}
+
+			List<InvokeRule> invokeRuleList = cronjobRules.getInvokeRuleList();
+			for (int irIdx = 0; irIdx < invokeRuleList.size(); irIdx++) {
+				InvokeRule invokeRule = invokeRuleList.get(irIdx);
+				if (invokeRule == null) {
+					continue;
+				}
+
+				List<Schedule> schList = invokeRule.getScheduleList();
+				if (schList != null && schList.size() > 0) {
+					CronjobTask task = new CronjobTask(ss, this, invokeRule);
+					if (ss.logInfoEnabled())
+						ss.logInfo("register cronjob " + task.getJobId());
+					scheduler.register(String.valueOf(ss.getKey()), task,
+							schList);
+				}
+			}
+		}
+	}
+
+	public void killEventHandler() {
+		logInfo("Cancels all " + ProcessMap.CONF_SESSION_CRONJOBS);
+		scheduler.cancelAll();
+	}
+
+	public boolean isBusy() {
+		return false;
+	}
+
+	class CronjobTask extends ScheduleJob {
+		Session ss;
+		SessionCronjob cronjob;
+		InvokeRule invokeRule;
+		Class beanClass = null;
+
+		public CronjobTask(Session ss, SessionCronjob cronjob,
+				InvokeRule invokeRule) {
+			// super(ss.getLocalIp() + ":" + ss.getLocalPort() + "/"
+			// + ss.getService().getServiceId() + "-"
+			// + invokeRule.getBeanClass().getName());
+			super(ss.getService().getServiceId() + "-"
+					+ invokeRule.getBeanClass().getName() + "-"
+					+ ss.getLoginId());
+
+			if (invokeRule.isSynchronized()) {
+				SqlConnPool sqlConnPool = ss.getService().getSqlConnPool();
+				if (sqlConnPool != null) {
+					enableSynchronized(sqlConnPool);
+				}
+			}
+
+			this.ss = ss;
+			this.cronjob = cronjob;
+			this.invokeRule = invokeRule;
+			this.beanClass = invokeRule.getBeanClass();
+		}
+
+		public void run() {
+			try {
+				if (ss.isClosed()) {
+					return;
+				}
+				ss.getService().executeThreadInitializer();
+
+				Bean bean = MsgRouter.getInstance().getBeanCache()
+						.getBean(ss.getService(), ss, beanClass);
+
+				if (bean instanceof AsyncBean) {
+					AsyncBean asyncBean = (AsyncBean) bean;
+					AsyncBeanOnCronjobInvoker asyncBeanInvoker = new AsyncBeanOnCronjobInvoker(
+							ss.getService(), ss, invokeRule, asyncBean);
+					asyncBeanInvoker.execute();
+					if (asyncBeanInvoker.isRepeatable()) {
+						pendingAsyncBeans.put(asyncBeanInvoker);
+					}
+				} else if (bean instanceof SyncBean) {
+					SyncBean syncBean = (SyncBean) bean;
+					if (!syncBean.isRunning()) {
+						new Thread(new SyncBeanRunnerThr(ss, cronjob, syncBean))
+								.start();
+					}
+				}
+			} catch (Throwable e) {
+				ss.logError(e);
+			} finally {
+			}
+		}
+	}
+}

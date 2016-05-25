@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<service>
+	<elastic>
+		<beanConfiguration classpath="../classes">
+			config/bean.xml
+		</beanConfiguration>
+	</elastic>
+
+	<sqlMaps sqlConnPool="default" xml="config/sqlMaps.xml" />
+	
+	<!--
+	   o port: 서버 리스팅 포트 
+	 -->
+	<port>${mstSender.port}</port>
+
+	<!--
+	   o type: 서버와 통신할 때 메시지를 전송할 대상의 종류를 설정한다. 
+	      . msgrouterId
+	         - 서버접속시 로그인하는 방식을 본 제품의 기본방식으로 로그인할 경우이며 
+	            이 로그인 아이디를 대상으로 메시지를 전송한다.
+	      . customId
+	         - 사용자가 작성한 loginerClass를 이용하여 로그인할 경우이며 이 로그인 아이디를
+	            대상으로 메시지를 전송한다.
+	      . ipAddress
+	         - 별도의 로그인 절차를 거치지 않으며 메시지의 전송은 클라이언트의 IP 주소를 대상으로 한다.
+	      . session
+	         - 벌도의 로그인 절차를 거치지 않으며 메시지의 전송은 클라이언트의 접속된 세션들을 대상으로
+	            한다. 따라서 서버에서는 클라이언트들의 세션 아이디 별로 메시지를 전송할 수 있다.
+	 -->	
+	<routingTarget type="customId">
+		<msgrouterId xml="../config/auth/authMgr.xml" logDbPoolName="default">
+			<users></users>
+			<groups>masterSync</groups>
+		</msgrouterId>
+		
+		<!--
+		   o dupAlive: 동일한 loginId로 접속할 경우 살려두는 대상 설정. 설정할 수 있는 값은 all, first, last가 있다. 
+		      all: 모든 세션을 살려둠. 
+		      first: 첫번째 접속한 세션만 살려둠. 
+		      last: 마지막에 접속한 세션만 살려둠 
+		-->
+		<customId loginerClass="toms.exabus.service.MTomsLoginer" dupAlive="all" />
+		
+		<ipAddress/>
+		
+		<session/>
+	</routingTarget>
+
+	<connection>
+		<props>
+				<String key="encoding">UTF-8</String>
+			<!-- recvTimeoutMillis: If more than 0 -->
+				<int key="recvTimeoutMillis">30000</int>
+		</props>
+		<messageFactory class="msgrouter.adapter.json.JSONMessageFactory" />
+		<messageRecver class="msgrouter.adapter.json.JSONRecver" />
+		<messageSender class="msgrouter.adapter.json.JSONSender" />
+	</connection>
+
+	<minAcceptThrs>1</minAcceptThrs>
+	<minTransferThrs>1</minTransferThrs>
+	<maxSessionsPerTransferThr>1024</maxSessionsPerTransferThr>
+	<minBeanThrs>1</minBeanThrs>
+	<maxSessionsPerBeanThr>1024</maxSessionsPerBeanThr>
+
+	<!-- 
+		ServiceInitializer: 서비스가 구동하면서 초기에 한번 실행되는 클래스
+	 -->
+	<ServiceInitializer class="toms.exabus.service.MTomsServiceInitializer" />
+
+	<!-- 
+		SessionInitializer: Session(클라이언트 서버간의 연결)이 이루어질 때 초기에 한번 실행되는 클래스
+	 -->
+	<SessionInitializer class="toms.exabus.service.MTomSessionInitializer" />
+
+	<!--
+		 SessionCloser: Session(클라이언트 서버간의 연결)이 끊어질 때 한번 실행되는 클래스
+	 -->
+	<SessionCloser class="toms.exabus.service.MTomsSessionCloser" />
+	
+	<processMap xml="config/processMap.xml" />
+
+	<!-- 통신연결별  Log 기록에 사용하는 설정 -->
+	<!-- logPer: off, service, loginId -->
+	<messageLogger logPer="loginId">
+		<root>${log.dir}/packet</root>
+		<datePattern>yyyy-MM-dd_HH_mm_ss</datePattern>
+		<encoding>UTF-8</encoding>
+		<layout>org.apache.log4j.PatternLayout</layout>
+		<layoutParams>ConversionPattern=[%d] %m%n</layoutParams>
+		<maxFileSize>10240000</maxFileSize>
+	</messageLogger>
+
+</service>

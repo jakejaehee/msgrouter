@@ -1,0 +1,45 @@
+
+		<cronjob class="full class name">
+			<timeTable>
+				<period>
+					<second>30</second>
+				</period>
+			</timeTable>
+		
+			<timeTable>
+				<daily>
+					<hour>02</hour>
+					<minute>00</minute>
+				</daily>
+			</timeTable>
+		
+			<timeTable>
+				<weekly>
+					<!-- SUN, MON, TUE, WED, THU, FRI, SAT -->
+					<day>FRI</day>
+					<hour>13</hour>
+					<minute>16</minute>
+				</weekly>
+			</timeTable>
+		
+			<timeTable>
+				<monthly>
+					<!-- number(1 ~ 31) or END -->
+					<date>2</date>
+					<hour>13</hour>
+					<minute>17</minute>
+				</monthly>
+			</timeTable>
+		
+			<timeTable>
+				<yearly>
+					<!-- 1 ~ 12 -->
+					<month>11</month>
+					<date>2</date>
+					<hour>13</hour>
+					<minute>18</minute>
+				</yearly>
+			</timeTable>
+		
+		</cronjob>
+		

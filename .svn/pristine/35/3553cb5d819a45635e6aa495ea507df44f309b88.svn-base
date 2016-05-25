@@ -1,0 +1,36 @@
+package msgrouter.engine.socket.server.impl;
+
+import msgrouter.api.SocketConnection;
+import msgrouter.api.interfaces.bean.ServerLoginer;
+import msgrouter.engine.SessionContext;
+import msgrouter.engine.socket.server.AbstractServerSession;
+import msgrouter.engine.socket.server.AbstractServerSessionFactory;
+import msgrouter.engine.socket.server.SelectorThr;
+import msgrouter.engine.socket.server.Server;
+import elastic.util.net.SocketUtil;
+import elastic.util.util.TechException;
+
+public class ServerSessionFactory implements AbstractServerSessionFactory {
+
+	public AbstractServerSession createSession(Server svc,
+			SelectorThr selThread, SocketUtil su) throws TechException {
+		String localIp = su.getLocalIp();
+		int localPort = su.getLocalPort();
+		String remoteIp = su.getRemoteIp();
+		int remotePort = su.getRemotePort();
+
+		SessionContext context = new SessionContext(svc, remoteIp, remotePort);
+
+		ServerLoginer loginer = (ServerLoginer) svc.newLoginer();
+
+		SocketConnection conn = new SocketConnection(context, svc
+				.getServiceConfig().getConnectionProps(), svc
+				.getServiceConfig().getRecverClass(), svc.getServiceConfig()
+				.getSenderClass(), su);
+
+		AbstractServerSession ss = new ServerSession(context, conn, loginer);
+		context.setSession(ss);
+
+		return ss;
+	}
+}

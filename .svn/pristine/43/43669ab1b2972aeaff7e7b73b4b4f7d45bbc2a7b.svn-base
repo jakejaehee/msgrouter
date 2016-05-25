@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project name="msgrouter" default="deploy" basedir=".">
+	<property name="prj.version" value="1.4.2" />
+	<property name="src.dir" value="./src/main/java" />
+	<property name="lib.dir.src" value="lib" />
+	<property name="jar.dist.dir" value="./build" />
+	<property name="javadoc.dir" value="docs/api" />
+	<property name="jar.name.server" value="${ant.project.name}.jar" />
+
+	<target name="clean">
+		<!-- <delete dir="${jar.dist.dir}/classes" /> -->
+		<delete file="${jar.dist.dir}/*.jar" />
+	</target>
+
+	<target name="mkclasspath">
+	    <pathconvert property="prj.classpath" pathsep=" ">  
+	      <mapper>  
+	        <chainedmapper>  
+	          <!-- remove absolute path -->  
+	          <flattenmapper />  
+	  
+	          <!-- add lib/ prefix -->  
+	          <!-- globmapper from="*" to="lib/*" / -->  
+	        </chainedmapper>  
+	      </mapper>  
+	      <path>  
+	        <!-- lib.home contains all jar files,   
+	                                        in several subdirectories -->  
+	        <fileset dir="${lib.dir.src}">  
+	          <include name="**/*.jar" />  
+	        </fileset>  
+	      </path>  
+	    </pathconvert> 
+	</target>
+
+	<target name="mkjar" depends="clean,mkclasspath">
+		<tstamp>
+			<format property="DSTAMP" pattern="yyyy.MM.dd"/>
+			<format property="TSTAMP" pattern="HH:mm:ss"/>
+		</tstamp>
+		<property name="builddate" value="${DSTAMP} ${TSTAMP}"/>
+		<delete dir="${jar.dist.dir}/${jar.name.server}" />
+		<jar destfile="${jar.dist.dir}/${jar.name.server}" basedir="${jar.dist.dir}/classes" includes="**" excludes="*.class" compress="true" index="false">
+            <manifest> <!-- 실행시킬 main method 가 있는 클래스의 경로를 적어준다. -->
+                <attribute name="Main-Class" value="msgrouter.engine.Main"/>       
+                <attribute name="Jar-Version" value="${ant.project.name}-${prj.version}"/>       
+            	<attribute name="Jar-Build-Date" value="${builddate}" />
+            	<attribute name="Class-Path" value=". ${prj.classpath}" />
+            </manifest>
+		</jar>
+		<delete dir="${jar.dist.dir}/msgrouter-src.jar" />
+		<jar destfile="${jar.dist.dir}/msgrouter-src.jar" basedir="./src/main/java" includes="**" excludes="*.java" compress="true" index="false">
+		</jar>
+	</target>
+
+	<target name="deploy" depends="mkjar">
+		<copy todir="${basedir}/../msgrouter-uvisSevMdt-src/lib" overwrite="true">
+			<fileset dir="${lib.dir.src}" includes="elastic-1.0.2-jdk15.jar,log4j-1.2.16.jar" />
+			<fileset file="${jar.dist.dir}/${jar.name.server}" />
+		</copy>
+
+		<copy todir="${basedir}/../msgrouter-test-client/lib" overwrite="true">
+			<fileset dir="${lib.dir.src}" includes="**/*.jar" />
+			<fileset file="${jar.dist.dir}/${jar.name.server}" />
+		</copy>
+
+		<copy todir="${basedir}/../msgrouter-test-server/lib" overwrite="true">
+			<fileset dir="${lib.dir.src}" includes="**/*.jar" />
+			<fileset file="${jar.dist.dir}/${jar.name.server}" />
+		</copy>
+	</target>
+
+</project>

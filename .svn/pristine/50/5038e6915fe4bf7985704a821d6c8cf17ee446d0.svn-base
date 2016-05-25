@@ -1,0 +1,124 @@
+package msgrouter.engine.socket.server;
+
+import java.io.IOException;
+import java.nio.channels.SelectableChannel;
+import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.List;
+
+import msgrouter.engine.Service;
+import elastic.util.lifecycle.LifeCycle;
+import elastic.util.lifecycle.LifeCycleObject;
+import elastic.util.queue.QueueTimeoutException;
+import elastic.util.util.TechException;
+
+final class SelectorPool extends LifeCycleObject {
+	private final Service svc;
+	private final SelectorEventHandler eventHandler;
+	private final int minThreads;
+	private final boolean transferSelPool;
+	private final List<SelectorThr> selectorThreadsList = new ArrayList<SelectorThr>();
+
+	private volatile int nextIdx;
+
+	SelectorPool(Service svc, SelectorEventHandler eventHandler,
+			int minThreads, boolean transferSelPool) throws IOException {
+		super(SelectorPool.class);
+
+		this.svc = svc;
+		this.eventHandler = eventHandler;
+		this.minThreads = minThreads;
+		this.transferSelPool = transferSelPool;
+		this.nextIdx = 0;
+	}
+
+	public void run() {
+		for (int i = 0; i < minThreads; ++i) {
+			try {
+				createSelectorThread();
+			} catch (Exception e) {
+				logError(e);
+			}
+		}
+		this.nextIdx = 0;
+	}
+
+	private SelectorThr createSelectorThread() throws IOException,
+			TechException {
+		SelectorThr st = new SelectorThr(svc, eventHandler, transferSelPool);
+		selectorThreadsList.add(st);
+		new LifeCycle(st, "selThr", this).start();
+		logInfo("created a SelectorThead.");
+		return st;
+	}
+
+	boolean register(SelectableChannel sc, LifeCycleObject attachment)
+			throws IOException, TechException, QueueTimeoutException {
+		synchronized (selectorThreadsList) {
+			int lastIdx = (nextIdx == 0 ? selectorThreadsList.size() : nextIdx) - 1;
+			for (;;) {
+				SelectorThr st = (SelectorThr) selectorThreadsList.get(nextIdx);
+				boolean success = st.register(sc, attachment);
+				if (!success) {
+					// key == null designates that the thread was unable to
+					// register the channel. It is either dead, or just its
+					// selector is saturated.
+					if (st.currentLifeCycle().isShutdownMode()) {
+						selectorThreadsList.remove(nextIdx);
+						--nextIdx;
+						if (nextIdx == -1) {
+							nextIdx = selectorThreadsList.size() - 1;
+							if (nextIdx == -1) {
+								// last alive thread has died, which should
+								// not happen normally - create new thread.
+								nextIdx = 0;
+								return createSelectorThread().register(sc,
+										attachment);
+							}
+						}
+					}
+				} else {
+					if (++nextIdx == selectorThreadsList.size())
+						nextIdx = 0;
+					return true;
+				}
+				if (nextIdx == lastIdx) {
+					// This is a small optimization - if all threads are
+					// currently saturated, assume the newly created thread is
+					// optimal selection for next registration.
+					nextIdx = selectorThreadsList.size();
+					return createSelectorThread().register(sc, attachment);
+				} else {
+					if (++nextIdx == selectorThreadsList.size())
+						nextIdx = 0;
+				}
+			}
+		}
+	}
+
+	void stop() {
+		synchronized (selectorThreadsList) {
+			Iterator it = selectorThreadsList.iterator();
+			while (it.hasNext()) {
+				((SelectorThr) it.next()).currentLifeCycle().kill();
+			}
+		}
+	}
+
+	int[] getThreadLoad() {
+		int[] retval = new int[selectorThreadsList.size()];
+		for (int i = 0; i < retval.length; ++i) {
+			retval[i] = ((SelectorThr) selectorThreadsList.get(i))
+					.getThreadLoad();
+		}
+		return retval;
+	}
+
+	public boolean isBusy() {
+		return false;
+	}
+
+	public void killEventHandler() {
+		stop();
+	}
+}

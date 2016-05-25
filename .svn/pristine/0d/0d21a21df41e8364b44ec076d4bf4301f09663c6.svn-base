@@ -1,0 +1,97 @@
+package msgrouter.engine;
+
+import msgrouter.api.QueueEntry;
+import msgrouter.engine.com.workerthread.NoSessionBeanThr;
+import msgrouter.engine.com.workerthread.NoSessionCronjob;
+import elastic.util.lifecycle.LifeCycle;
+import elastic.util.lifecycle.LifeCycleObject;
+import elastic.util.queue.PersistentQueue;
+import elastic.util.queue.Queue;
+import elastic.util.queue.QueueParams;
+import elastic.util.queue.QueueTimeoutException;
+import elastic.util.queue.SynchronizedQueue;
+import elastic.util.util.TechException;
+
+public class NoSession extends LifeCycleObject {
+	private final Service svc;
+
+	private NoSessionBeanThr beanThr = null;
+	private NoSessionCronjob cronjob = null;
+	private Queue<QueueEntry> swq = null;
+	private String swqKey = null;
+
+	public NoSession(Service svc) {
+		super(NoSession.class);
+
+		this.svc = svc;
+		this.swqKey = Naming.switchQueueKey(svc);
+	}
+
+	public Service getService() {
+		return svc;
+	}
+
+	public void run() {
+		beanThr = new NoSessionBeanThr(this);
+		new LifeCycle(beanThr, "noSsBeanThr", this).start();
+
+		startCronjob();
+	}
+
+	public final void stopCronjob() {
+		if (cronjob != null) {
+			if (cronjob.currentLifeCycle() != null) {
+				cronjob.currentLifeCycle().killNow();
+			}
+		}
+	}
+
+	public final void startCronjob() {
+		cronjob = new NoSessionCronjob(this);
+		new LifeCycle(cronjob, "noSsCronjob", this).start();
+	}
+
+	public final void restartCronjob() {
+		stopCronjob();
+		startCronjob();
+	}
+
+	public void putSWQ(QueueEntry qe) throws TechException,
+			QueueTimeoutException {
+		getSWQ().put(qe);
+	}
+
+	public QueueEntry pollSWQ() throws TechException {
+		return swq != null ? getSWQ().poll() : null;
+	}
+
+	private Queue<QueueEntry> getSWQ() {
+		if (swq == null) {
+			synchronized (this) {
+				if (swq == null) {
+					QueueParams qParams = svc.getServiceConfig()
+							.getQueueParams();
+					if (qParams.getQueueType() == Queue.QTYPE_FILE) {
+						this.swq = new PersistentQueue<QueueEntry>(swqKey,
+								qParams);
+						new LifeCycle((LifeCycleObject) swq, "SWQ", this)
+								.start();
+					} else if (qParams.getQueueType() == Queue.QTYPE_MEMORY) {
+						this.swq = new SynchronizedQueue<QueueEntry>(
+								qParams.getMemoryLoadEntries(),
+								qParams.getTimeoutMillisecond());
+					}
+				}
+			}
+		}
+		return swq;
+	}
+
+	public void killEventHandler() {
+		MsgRouter.getInstance().getBeanCache().deleteBeans(getService(), this);
+	}
+
+	public boolean isBusy() {
+		return false;
+	}
+}

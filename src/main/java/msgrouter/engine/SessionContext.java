@@ -1,0 +1,210 @@
+package msgrouter.engine;
+
+import java.io.File;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.Map;
+import java.util.Map.Entry;
+
+import elastic.util.util.RollingLogger;
+import elastic.util.util.RollingLoggerParams;
+import elastic.util.util.TechException;
+import elastic.util.xml.XmlEnv;
+import elastic.web.dataset.WebRow;
+import msgrouter.api.interfaces.MessageLoggerFormat;
+import msgrouter.constant.Const;
+import msgrouter.engine.config.ServiceConfig;
+
+public class SessionContext {
+
+	private final Service svc;
+	private Session ss = null;
+	private String localIp = null;
+	private int localPort = -1;
+	private String remoteIp = null;
+	private int remotePort = -1;
+	private String loginId = null;
+	private MessageLogger ssMsgLogger = null;
+	private MessageLoggerFormat ssMsgLoggerFormat = null;
+
+	private Map<String, Object> map = null;
+	private volatile boolean closed = true;
+
+	public SessionContext(Service svc, String remoteIp, int remotePort) {
+		this.svc = svc;
+		this.remoteIp = remoteIp;
+		this.remotePort = remotePort;
+
+		this.map = new WebRow<String, Object>();
+		this.closed = false;
+	}
+
+	public void setSession(Session session) {
+		this.ss = session;
+	}
+
+	public Session getSession() {
+		return this.ss;
+	}
+
+	public long getLastIOTime() {
+		return ss != null ? ss.getLastIOTime() : 0L;
+	}
+
+	public Service getService() {
+		return svc;
+	}
+
+	public ServiceConfig getServiceConfig() {
+		return svc.getServiceConfig();
+	}
+
+	public MessageLogger getMessageLogger() {
+		if (ssMsgLogger == null)
+			return svc.getServiceMessageLogger();
+		return ssMsgLogger;
+	}
+
+	public MessageLoggerFormat getMessageLoggerFormat() {
+		if (ssMsgLoggerFormat == null)
+			try {
+				return (MessageLoggerFormat) svc.getServiceMessageLogger().getMessageLoggerParams().getFormatClass()
+						.newInstance();
+			} catch (Throwable t) {
+				throw new RuntimeException(t);
+			}
+		return ssMsgLoggerFormat;
+	}
+
+	public final String getLocalIp() {
+		return localIp;
+	}
+
+	public final int getLocalPort() {
+		return localPort;
+	}
+
+	public final String getRemoteIp() {
+		return remoteIp;
+	}
+
+	public final int getRemotePort() {
+		return remotePort;
+	}
+
+	public final void setLoginId(String loginId) throws TechException {
+		this.loginId = loginId;
+
+		/*
+		 * Engine logger setting.
+		 */
+		String root = XmlEnv.get("log.dir") + File.separator + "container" + File.separator + "service-"
+				+ svc.getServiceId() + File.separator + "session" + File.separator + loginId;
+
+		RollingLoggerParams loggerParams = new RollingLoggerParams();
+		loggerParams.setPath(root, "session.log");
+		loggerParams.setDatePattern(Const.LOG_FILE_DATE_PATTERN);
+		loggerParams.setEncoding(Const.LOG_ENCODING);
+		loggerParams.setLayoutName(Const.LOG_LAYOUT_CLASS);
+		loggerParams.setLayoutParams(Const.LOG_LAYOUT_CLASS_PARAMS_4engine1);
+		loggerParams.setMaxFileSize(10240000);
+		loggerParams.setLevel(ss.getLogLevel());
+		// loggerParams.setTag(logTag(ss));
+
+		this.ss.setLogger(RollingLogger.getLogger(loggerParams));
+
+		/*
+		 * Message logger setting.
+		 */
+		MessageLoggerParams svcMsgLogParams = svc.getServiceConfig().getServiceMessageLoggerParams();
+
+		if (svcMsgLogParams != null) {
+			if (svcMsgLogParams.getLogPer() == Const.IVAL_MSG_LOG_PER_OFF) {
+				ssMsgLogger = new MessageLogger();
+			} else if (svcMsgLogParams.getLogPer() == Const.IVAL_MSG_LOG_PER_SERVICE) {
+				// ssMsgLogger = svc.getServiceMessageLogger();
+			} else {
+				MessageLoggerParams ssMsgLogParams = svcMsgLogParams.clone();
+				ssMsgLogParams.setPath(
+						svcMsgLogParams.getRoot() + File.separator + "session" + File.separator + loginId,
+						svcMsgLogParams.getFilename());
+				ssMsgLogger = new MessageLogger(ssMsgLogParams);
+				try {
+					this.ssMsgLoggerFormat = (MessageLoggerFormat) ssMsgLogger.getMessageLoggerParams().getFormatClass()
+							.newInstance();
+				} catch (Throwable t) {
+					throw new RuntimeException(t);
+				}
+			}
+		} else {
+			ssMsgLogger = new MessageLogger();
+		}
+	}
+
+	public final String getLoginId() {
+		return loginId;
+	}
+
+	public Object put(String key, Object value) {
+		return map.put(key, value);
+	}
+
+	public void putAll(Map<String, Object> m) {
+		map.putAll(m);
+	}
+
+	public Object get(String key) {
+		return map.get(key);
+	}
+
+	public Object remove(String key) {
+		return map.remove(key);
+	}
+
+	public void clear() {
+		map.clear();
+	}
+
+	public void close() {
+		this.closed = true;
+
+		clear();
+
+		if (this.ssMsgLogger != null)
+			this.ssMsgLogger.close();
+	}
+
+	public boolean isClosed() {
+		return this.closed;
+	}
+
+	public final Map<String, Object> toMap() {
+		Map<String, Object> m = new HashMap<String, Object>();
+		Iterator<Entry<String, Object>> it = map.entrySet().iterator();
+		while (it.hasNext()) {
+			Entry<String, Object> e = (Entry<String, Object>) it.next();
+			m.put(e.getKey(), e.getValue());
+		}
+		return m;
+	}
+
+	public final ServiceContext getServiceContext() {
+		return svc.getServiceContext();
+	}
+
+	private static String logTag(String svcId, String loginId, String remoteIp, int remotePort) {
+		if (loginId != null) {
+			return "### [" + svcId + "/" + loginId + "<->" + remoteIp + ":" + remotePort + "]";
+		} else {
+			return "### [" + svcId + "<->" + remoteIp + ":" + remotePort + "]";
+		}
+	}
+
+	private static String logTag(Session ss) {
+		String svcId = ss.getService().getServiceId();
+		String loginId = ss.getLoginId();
+		String remoteIp = ss.getRemoteIp();
+		int remotePort = ss.getRemotePort();
+		return logTag(svcId, loginId, remoteIp, remotePort);
+	}
+}

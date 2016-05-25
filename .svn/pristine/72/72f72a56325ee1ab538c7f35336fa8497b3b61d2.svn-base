@@ -1,0 +1,176 @@
+package msgrouter.engine.com.workerthread;
+
+import java.util.List;
+
+import msgrouter.api.MessageUtil;
+import msgrouter.api.QueueEntry;
+import msgrouter.api.interfaces.bean.AsyncBean;
+import msgrouter.api.interfaces.bean.Bean;
+import msgrouter.api.interfaces.bean.SyncBean;
+import msgrouter.constant.Const;
+import msgrouter.engine.MsgRouter;
+import msgrouter.engine.Router;
+import msgrouter.engine.Session;
+import msgrouter.engine.SessionRegistry;
+import msgrouter.engine.config.rule.InvokeRule;
+import msgrouter.engine.config.rule.MessageRule;
+import msgrouter.engine.config.rule.RoutingRules;
+import msgrouter.engine.queue.NotSynchronizedQueue;
+import msgrouter.engine.queue.QueueTimeoutException;
+import elastic.util.lifecycle.LifeCycleObject;
+import elastic.util.util.TechException;
+
+public class SessionBeanThr extends LifeCycleObject implements Runnable {
+	private final SessionRegistry ssRegistry;
+	private final NotSynchronizedQueue<AsyncBeanOnMessageInvoker> pendingAsyncBeans = new NotSynchronizedQueue<AsyncBeanOnMessageInvoker>();
+
+	private boolean busy = false;
+
+	public SessionBeanThr(SessionRegistry sessionRegistry) {
+		super(SessionBeanThr.class);
+
+		this.ssRegistry = sessionRegistry;
+	}
+
+	public void run() {
+		try {
+			ssRegistry.getService().executeThreadInitializer();
+		} catch (Throwable e) {
+			throw new RuntimeException(e);
+		}
+
+		while (!currentLifeCycle().isShutdownMode()
+				|| !currentLifeCycle().readyToShutdown()) {
+			try {
+				if (currentLifeCycle().sleep(Const.VAL_LOOP_SLEEP_MILLIS,
+						Const.VAL_LOOP_SLEEP_NANOS)) {
+					continue;
+				}
+
+				List ssList = ssRegistry.childList();
+				for (int s = 0; ssList != null && s < ssList.size(); s++) {
+					Session ss = (Session) ssList.get(s);
+					if (ss == null)
+						continue;
+
+					QueueEntry recvQE = ss.pollRQ();
+					if (recvQE != null) {
+						busy = true;
+						try {
+							handleRecvQueueEntry(ss, recvQE);
+						} catch (Throwable t) {
+							ss.logError(t);
+						}
+						busy = false;
+					}
+					handlePendingAsyncBean();
+				}
+				handlePendingAsyncBean();
+			} catch (Throwable t) {
+				logError(t);
+			}
+		} // while
+	}
+
+	private void handlePendingAsyncBean() throws TechException,
+			QueueTimeoutException {
+		AsyncBeanOnMessageInvoker asyncBeanInvoker = pendingAsyncBeans.poll();
+		if (asyncBeanInvoker != null) {
+			asyncBeanInvoker.execute();
+			if (asyncBeanInvoker.isRepeatable()) {
+				pendingAsyncBeans.put(asyncBeanInvoker);
+			}
+		}
+	}
+
+	private void handleRecvQueueEntry(final Session ss, final QueueEntry recvQE) {
+		try {
+			Router.sendTo(recvQE, ssRegistry.getService(), ss);
+
+			// 주어진 메시지 타입에 해당하는 룰 획득
+			MessageRule msgRule = ssRegistry.getService().getServiceConfig()
+					.getProcessMap().getMessageRule(recvQE.getMessageType());
+			if (msgRule == null) {
+				ss.logWarn("Message rule is not found for received message '"
+						+ recvQE.getBriefing() + "'");
+				busy = false;
+				return;
+			}
+
+			RoutingRules routingRules = msgRule.getRoutingRules();
+			if (routingRules != null
+					&& routingRules.getSwitchToList().size() > 0) {
+				Router.switchTo(recvQE, ssRegistry.getService(), ss,
+						routingRules);
+			}
+
+			List<InvokeRule> invokeRuleList = msgRule.getInvokeRuleList();
+			if (invokeRuleList != null && invokeRuleList.size() > 0) {
+				for (int irIdx = 0; irIdx < invokeRuleList.size(); irIdx++) {
+					if (ss.isClosed()) {
+						ss.logWarn("session is closed.");
+						break;
+					}
+					InvokeRule invokeRule = invokeRuleList.get(irIdx);
+					try {
+						invokeResBean(ss, invokeRule, recvQE);
+					} catch (Throwable t) {
+						ss.logError(t);
+					}
+				}
+			}// if
+			busy = false;
+		} catch (Throwable t) {
+			ss.logError(t);
+		} finally {
+		}
+	}
+
+	private void invokeResBean(Session ss, InvokeRule invokeRule,
+			QueueEntry recvQE) throws TechException, QueueTimeoutException {
+		Class beanClass = invokeRule.getBeanClass();
+		if (beanClass == null) {
+			ss.logWarn("Message rule is not found for received message '"
+					+ recvQE.getBriefing() + "'");
+			return;
+		}
+		Bean bean = MsgRouter.getInstance().getBeanCache()
+				.getBean(ss.getService(), ss, beanClass);
+
+		if (bean instanceof AsyncBean) {
+			AsyncBean asyncBean = (AsyncBean) bean;
+			AsyncBeanOnMessageInvoker asyncBeanInvoker = new AsyncBeanOnMessageInvoker(
+					ssRegistry.getService(), ss, invokeRule, recvQE, asyncBean);
+			asyncBeanInvoker.execute();
+			if (asyncBeanInvoker.isRepeatable()) {
+				pendingAsyncBeans.put(asyncBeanInvoker);
+			}
+
+		} else if (bean instanceof SyncBean) {
+			if (ss.logDebugEnabled())
+				ss.logDebug("Thread of " + bean.getClass().getSimpleName()
+						+ " is starting...");
+
+			SyncBean syncBean = (SyncBean) bean;
+			syncBean.putRecvMessage(recvQE.getMessage(0));
+
+			if (ss.logTraceEnabled())
+				ss.logTrace(beanClass.getName() + ".putRecvMessage: " + MessageUtil.qeStr(recvQE));
+
+			if (!syncBean.isRunning()) {
+				new Thread(new SyncBeanRunnerThr(ss, this, syncBean)).start();
+			}
+
+		} else {
+			ss.logWarn("bean class '" + beanClass.getName()
+					+ "' is not suppored.");
+		}
+	}
+
+	public void killEventHandler() {
+	}
+
+	public boolean isBusy() {
+		return busy;
+	}
+}

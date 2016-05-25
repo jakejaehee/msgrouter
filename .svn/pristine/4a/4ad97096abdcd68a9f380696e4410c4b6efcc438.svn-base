@@ -1,0 +1,42 @@
+package msgrouter.engine.socket.server;
+
+import java.io.IOException;
+import java.nio.channels.SelectionKey;
+import java.nio.channels.SocketChannel;
+
+import msgrouter.api.interfaces.Message;
+import msgrouter.api.interfaces.bean.Loginer;
+import msgrouter.engine.Session;
+import msgrouter.engine.SessionContext;
+import msgrouter.engine.queue.QueueTimeoutException;
+import elastic.util.util.TechException;
+
+public abstract class AbstractServerSession extends Session {
+	private SocketChannel channel = null;
+	private SelectionKey selKey = null;
+
+	public AbstractServerSession(SessionContext ssContext, Loginer loginer,
+			Class implClass) {
+		super(ssContext, loginer, implClass);
+	}
+
+	public void setSelectionKey(SelectionKey selKey) {
+		this.channel = (SocketChannel) selKey.channel();
+		this.selKey = selKey;
+	}
+
+	public SocketChannel getChannel() {
+		return channel;
+	}
+
+	public SelectionKey getSelectionKey() {
+		return selKey;
+	}
+
+	public abstract void send() throws IOException, TechException;
+
+	public abstract Message recv() throws IOException, TechException;
+
+	public abstract void handleRecvMessage(Message recvMsg)
+			throws TechException, QueueTimeoutException;
+}
